@@ -46,6 +46,7 @@ One-question-at-a-time forms get more people to the end. The tools that made the
 - **Embeds**: inline, popup or plain iframe from one script tag, with hidden fields and a `clayform:submit` event.
 - **Results**: summaries per question, a searchable response table, partial responses, response detail, bulk delete.
 - **Webhooks** on every completed response, optionally signed with HMAC-SHA256.
+- **AI-ready**: a built-in **MCP server** and API keys, so an assistant like Grok, Claude or ChatGPT can build forms, publish them and read your results for you.
 - **Schedule & limits**: close on a date, after N responses, or by hand.
 - **Accessible**: real labels and roles, focus management, visible errors announced to screen readers, Reduce Motion respected.
 - **Private**: no third-party trackers. Uploaded files can only be downloaded from the dashboard.
@@ -142,6 +143,30 @@ With a signing secret set, verify the `X-Clayform-Signature` header:
 const expected = "sha256=" + crypto.createHmac("sha256", SECRET).update(rawBody).digest("hex");
 ```
 
+## Connect an AI agent (MCP)
+
+Clayform has a built-in [MCP](https://modelcontextprotocol.io) server, so an AI assistant can work in your account:
+create a form, add questions, set logic and a theme, publish it, hand you the link, then read responses and stats.
+
+1. Open **Account → AI agents and API keys** and create a key (for example “Grok Bot”). Pick what it may do.
+   Deleting responses is off unless you tick it. The key (`cf_…`) is shown once; only its hash is stored.
+2. In your assistant, add a custom MCP server (Streamable HTTP):
+   - URL: `https://<your-clayform>/api/mcp` (also served at `/api/mcp/mcp`)
+   - Header: `Authorization: Bearer cf_…`
+3. Ask it something like *“Make a 3-question lunch poll, publish it and give me the link.”*
+
+Tools: `list_field_types`, `list_forms`, `get_form`, `create_form`, `update_form`, `delete_form`, `add_field`,
+`update_field`, `remove_field`, `reorder_fields`, `set_logic`, `set_endings`, `set_theme`, `update_settings`,
+`publish_form`, `unpublish_form`, `get_share_links`, `list_responses`, `get_response`, `get_stats`, `export_responses`,
+`delete_responses`, `get_file`, `set_webhook`, `test_webhook`. Full reference: [docs/MCP.md](docs/MCP.md).
+
+The same keys work on the JSON API (`/api/forms`, `/api/forms/:id`, `/api/forms/:id/responses?limit=50&cursor=…`,
+`/api/forms/:id/export`), each route checking the key's permissions. Keys are limited to 120 requests a minute and can
+be revoked at any time. Key management itself (and account settings) only works signed in, never with a key.
+
+Try it with the MCP Inspector: `npx @modelcontextprotocol/inspector`, transport “Streamable HTTP”, your URL, and the
+`Authorization` header.
+
 ## Forms as code
 
 Download any form as JSON from **Share → Download form JSON**, and import it with **Import JSON** on the dashboard. The schema is validated on import ([`src/lib/schema.ts`](src/lib/schema.ts)), so a hand-edited file can't break an install.
@@ -157,7 +182,10 @@ Download any form as JSON from **Share → Download form JSON**, and import it w
 src/
   lib/engine.ts        logic jumps, scoring, recall, validation (shared)
   lib/submit.ts        partial saves, resume tokens, completion, webhooks
-  lib/db.ts            SQLite storage
+  lib/db.ts            storage (SQLite or Postgres)
+  lib/formOps.ts       validated single-step form edits (used by the MCP server)
+  lib/apiKeys.ts       API keys and permissions
+  lib/mcp/             the MCP server and its HTTP handler
   components/player/   the form respondents see
   components/builder/  build, logic, design, settings, share
   components/results/  summary, responses, drop-off
@@ -169,7 +197,9 @@ public/embed.js        the embed script
 
 ```bash
 npm run dev         # local server with hot reload
-npm test            # engine unit tests (vitest)
+npm test            # engine, security, form-ops and MCP tests (vitest)
+# Run the MCP tests against Postgres too:
+CLAYFORM_TEST_DATABASE_URL=postgres://… npx vitest run tests/mcp.test.ts
 npm run typecheck
 npm run build
 ```

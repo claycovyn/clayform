@@ -6,15 +6,15 @@ import { TEMPLATES } from "@/lib/templates";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const { user, denied } = await requireUser();
+export async function GET(req: Request) {
+  const { user, denied } = await requireUser(req, "forms:read");
   if (denied) return denied;
   return json({ forms: await listForms(user.id) });
 }
 
 /** Create from a template ({ template }) or import a form JSON ({ form }). */
 export async function POST(req: Request) {
-  const { user, denied } = await requireUser();
+  const { user, denied } = await requireUser(req, "forms:write");
   if (denied) return denied;
   const body = await readJson<{ template?: string; form?: unknown; copy?: boolean }>(req, 5_000_000);
   if (!body) return json({ error: "Bad request." }, 400);

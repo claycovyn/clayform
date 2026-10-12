@@ -8,10 +8,10 @@ type Params = { params: Promise<{ id: string }> };
 
 /** ?format=csv|json&status=all|complete|partial  — or ?format=form for the form definition. */
 export async function GET(req: Request, { params }: Params) {
-  const { form, denied } = await requireOwnedForm((await params).id);
-  if (denied) return denied;
   const url = new URL(req.url);
   const format = url.searchParams.get("format") ?? "csv";
+  const { form, denied } = await requireOwnedForm((await params).id, req, format === "form" ? "forms:read" : "responses:read");
+  if (denied) return denied;
   const status = url.searchParams.get("status") ?? "all";
   const name = form.title.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "form";
 

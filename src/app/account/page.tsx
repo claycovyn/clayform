@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LogoMark } from "@/components/Logo";
+import { headers } from "next/headers";
 import { AccountSettings } from "@/components/dashboard/AccountSettings";
+import { ApiKeys } from "@/components/dashboard/ApiKeys";
+import { DEFAULT_SCOPES, SCOPES } from "@/lib/apiKeys";
 import { currentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -24,8 +27,20 @@ export default async function AccountPage() {
         <p className="mt-1 text-ink-soft">
           {user.email} · member since {new Date(user.createdAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
         </p>
+        <div className="mt-8">
+          <ApiKeys scopes={SCOPES} defaults={DEFAULT_SCOPES} mcpUrl={`${await origin()}/api/mcp`} />
+        </div>
         <AccountSettings name={user.name} />
       </main>
     </div>
   );
+}
+
+/** This install's public address, for the MCP URL people paste into their agent. */
+async function origin(): Promise<string> {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
 }

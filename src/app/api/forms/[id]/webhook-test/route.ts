@@ -5,8 +5,8 @@ import type { ResponseRecord } from "@/lib/types";
 type Params = { params: Promise<{ id: string }> };
 
 /** Sends a sample payload so authors can check their endpoint. */
-export async function POST(_: Request, { params }: Params) {
-  const { form, denied } = await requireOwnedForm((await params).id);
+export async function POST(req: Request, { params }: Params) {
+  const { form, denied } = await requireOwnedForm((await params).id, req, "webhooks:write");
   if (denied) return denied;
   if (!form.settings.webhookUrl) return json({ error: "Save a webhook URL first." }, 400);
   const now = new Date().toISOString();

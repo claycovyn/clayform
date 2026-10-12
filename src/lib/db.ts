@@ -20,6 +20,34 @@ export interface User {
   createdAt: string;
 }
 
+/** An API key for agents and scripts. Only the SHA-256 of the secret is stored. */
+export interface ApiKey {
+  id: string;
+  userId: string;
+  name: string;
+  /** First characters of the key, shown so people can tell keys apart. */
+  prefix: string;
+  hash: string;
+  scopes: string[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface ResponseQuery {
+  limit: number;
+  /** Opaque cursor from a previous page. */
+  cursor?: string;
+  /** ISO time: only responses updated at or after it. */
+  since?: string;
+  completedOnly?: boolean;
+}
+
+export interface ResponsePage {
+  responses: ResponseRecord[];
+  nextCursor: string | null;
+}
+
 export interface StoredFile {
   id: string;
   formId: string;
@@ -49,10 +77,18 @@ interface Store {
   getResponse(id: string): Promise<{ response: ResponseRecord; resumeHash: string } | null>;
   saveResponse(response: ResponseRecord, resumeHash: string): Promise<void>;
   listResponses(formId: string): Promise<ResponseRecord[]>;
+  /** Newest first (by last update), paged with a cursor. */
+  queryResponses(formId: string, q: ResponseQuery): Promise<ResponsePage>;
   deleteResponses(formId: string, ids: string[]): Promise<void>;
   saveFile(file: StoredFile, data: Buffer): Promise<void>;
   getFile(id: string): Promise<StoredFile | null>;
   readFile(id: string): Promise<Buffer | null>;
+  createApiKey(key: ApiKey): Promise<void>;
+  listApiKeys(userId: string): Promise<ApiKey[]>;
+  getApiKeyByHash(hash: string): Promise<ApiKey | null>;
+  /** Returns false when the key doesn't exist, isn't this user's, or is already revoked. */
+  revokeApiKey(userId: string, id: string): Promise<boolean>;
+  touchApiKey(id: string, at: string): Promise<void>;
 }
 
 export const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
@@ -89,6 +125,37 @@ const toFile = (r: Row): StoredFile => ({
 });
 // Postgres returns jsonb as objects; SQLite returns text.
 const doc = <T>(v: unknown): T => (typeof v === "string" ? JSON.parse(v) : v) as T;
+const toKey = (r: Row): ApiKey => ({
+  id: String(r.id),
+  userId: String(r.user_id),
+  name: String(r.name),
+  prefix: String(r.prefix),
+  hash: String(r.hash),
+  scopes: doc<string[]>(r.scopes),
+  createdAt: iso(r.created_at),
+  lastUsedAt: r.last_used_at ? iso(r.last_used_at) : null,
+  revokedAt: r.revoked_at ? iso(r.revoked_at) : null,
+});
+
+// Response cursors encode the last row's (updated_at, id), the sort key.
+export function encodeCursor(updatedAt: string, id: string): string {
+  return Buffer.from(JSON.stringify([updatedAt, id])).toString("base64url");
+}
+export function decodeCursor(cursor: string): { updatedAt: string; id: string } | null {
+  try {
+    const [updatedAt, id] = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    if (typeof updatedAt !== "string" || typeof id !== "string" || Number.isNaN(Date.parse(updatedAt))) return null;
+    return { updatedAt: new Date(updatedAt).toISOString(), id };
+  } catch {
+    return null;
+  }
+}
+function page(rows: ResponseRecord[], limit: number): ResponsePage {
+  const more = rows.length > limit;
+  const responses = more ? rows.slice(0, limit) : rows;
+  const last = responses[responses.length - 1];
+  return { responses, nextCursor: more && last ? encodeCursor(last.updatedAt, last.id) : null };
+}
 
 // ---- SQLite ----------------------------------------------------------------
 
@@ -123,6 +190,12 @@ function sqliteStore(): Store {
         id TEXT PRIMARY KEY, form_id TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
         name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL, prefix TEXT NOT NULL, hash TEXT NOT NULL UNIQUE, scopes TEXT NOT NULL,
+        created_at TEXT NOT NULL, last_used_at TEXT, revoked_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS api_keys_user ON api_keys(user_id, created_at);
     `);
     // Installs from before accounts existed: add the owner column.
     const cols = handle.prepare("PRAGMA table_info(forms)").all() as Row[];
@@ -230,6 +303,24 @@ function sqliteStore(): Store {
       const rows = db().prepare("SELECT doc FROM responses WHERE form_id = ? ORDER BY updated_at DESC").all(formId) as Row[];
       return rows.map((r) => doc<ResponseRecord>(r.doc));
     },
+    async queryResponses(formId, q) {
+      const where = ["form_id = ?"];
+      const args: (string | number)[] = [formId];
+      if (q.completedOnly) where.push("completed_at IS NOT NULL");
+      if (q.since) {
+        where.push("updated_at >= ?");
+        args.push(new Date(q.since).toISOString());
+      }
+      const c = q.cursor ? decodeCursor(q.cursor) : null;
+      if (c) {
+        where.push("(updated_at < ? OR (updated_at = ? AND id < ?))");
+        args.push(c.updatedAt, c.updatedAt, c.id);
+      }
+      const rows = db()
+        .prepare(`SELECT doc FROM responses WHERE ${where.join(" AND ")} ORDER BY updated_at DESC, id DESC LIMIT ?`)
+        .all(...args, q.limit + 1) as Row[];
+      return page(rows.map((r) => doc<ResponseRecord>(r.doc)), q.limit);
+    },
     async deleteResponses(formId, ids) {
       const stmt = db().prepare("DELETE FROM responses WHERE form_id = ? AND id = ?");
       for (const id of ids) stmt.run(formId, id);
@@ -247,6 +338,28 @@ function sqliteStore(): Store {
     },
     async readFile(id) {
       return fs.promises.readFile(path.join(uploadDir, id)).catch(() => null);
+    },
+    async createApiKey(k) {
+      db()
+        .prepare("INSERT INTO api_keys (id, user_id, name, prefix, hash, scopes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .run(k.id, k.userId, k.name, k.prefix, k.hash, JSON.stringify(k.scopes), k.createdAt);
+    },
+    async listApiKeys(userId) {
+      const rows = db().prepare("SELECT * FROM api_keys WHERE user_id = ? ORDER BY created_at DESC").all(userId) as Row[];
+      return rows.map(toKey);
+    },
+    async getApiKeyByHash(hash) {
+      const r = db().prepare("SELECT * FROM api_keys WHERE hash = ?").get(hash) as Row | undefined;
+      return r ? toKey(r) : null;
+    },
+    async revokeApiKey(userId, id) {
+      const r = db()
+        .prepare("UPDATE api_keys SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL")
+        .run(new Date().toISOString(), id, userId);
+      return Number(r.changes) === 1;
+    },
+    async touchApiKey(id, at) {
+      db().prepare("UPDATE api_keys SET last_used_at = ? WHERE id = ?").run(at, id);
     },
   };
 }
@@ -284,7 +397,13 @@ function postgresStore(url: string): Store {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
         ALTER TABLE clayform_forms ADD COLUMN IF NOT EXISTS owner_id TEXT REFERENCES clayform_users(id) ON DELETE CASCADE;
-        CREATE INDEX IF NOT EXISTS clayform_forms_owner ON clayform_forms(owner_id, updated_at);`,
+        CREATE INDEX IF NOT EXISTS clayform_forms_owner ON clayform_forms(owner_id, updated_at);
+        CREATE TABLE IF NOT EXISTS clayform_api_keys (
+          id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES clayform_users(id) ON DELETE CASCADE,
+          name TEXT NOT NULL, prefix TEXT NOT NULL, hash TEXT NOT NULL UNIQUE, scopes JSONB NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL, last_used_at TIMESTAMPTZ, revoked_at TIMESTAMPTZ
+        );
+        CREATE INDEX IF NOT EXISTS clayform_api_keys_user ON clayform_api_keys(user_id, created_at);`,
       )
       .then(() => undefined)
       .catch((e) => {
@@ -395,6 +514,16 @@ function postgresStore(url: string): Store {
       const rows = await q`SELECT doc FROM clayform_responses WHERE form_id = ${formId} ORDER BY updated_at DESC`;
       return rows.map((r) => doc<ResponseRecord>(r.doc));
     },
+    async queryResponses(formId, qr) {
+      const q = await sql();
+      const c = qr.cursor ? decodeCursor(qr.cursor) : null;
+      const rows = await q`SELECT doc FROM clayform_responses WHERE form_id = ${formId}
+        ${qr.completedOnly ? q`AND completed_at IS NOT NULL` : q``}
+        ${qr.since ? q`AND updated_at >= ${new Date(qr.since).toISOString()}::timestamptz` : q``}
+        ${c ? q`AND (updated_at < ${c.updatedAt}::timestamptz OR (updated_at = ${c.updatedAt}::timestamptz AND id < ${c.id}))` : q``}
+        ORDER BY updated_at DESC, id DESC LIMIT ${qr.limit + 1}`;
+      return page(rows.map((r) => doc<ResponseRecord>(r.doc)), qr.limit);
+    },
     async deleteResponses(formId, ids) {
       if (!ids.length) return;
       const q = await sql();
@@ -414,6 +543,31 @@ function postgresStore(url: string): Store {
       const q = await sql();
       const [r] = await q`SELECT data FROM clayform_files WHERE id = ${id}`;
       return r ? Buffer.from(r.data as Uint8Array) : null;
+    },
+    async createApiKey(k) {
+      const q = await sql();
+      await q`INSERT INTO clayform_api_keys (id, user_id, name, prefix, hash, scopes, created_at)
+        VALUES (${k.id}, ${k.userId}, ${k.name}, ${k.prefix}, ${k.hash}, ${q.json(k.scopes)}, ${k.createdAt})`;
+    },
+    async listApiKeys(userId) {
+      const q = await sql();
+      const rows = await q`SELECT * FROM clayform_api_keys WHERE user_id = ${userId} ORDER BY created_at DESC`;
+      return rows.map(toKey);
+    },
+    async getApiKeyByHash(hash) {
+      const q = await sql();
+      const [r] = await q`SELECT * FROM clayform_api_keys WHERE hash = ${hash}`;
+      return r ? toKey(r) : null;
+    },
+    async revokeApiKey(userId, id) {
+      const q = await sql();
+      const rows = await q`UPDATE clayform_api_keys SET revoked_at = now()
+        WHERE id = ${id} AND user_id = ${userId} AND revoked_at IS NULL RETURNING id`;
+      return rows.length === 1;
+    },
+    async touchApiKey(id, at) {
+      const q = await sql();
+      await q`UPDATE clayform_api_keys SET last_used_at = ${at} WHERE id = ${id}`;
     },
   };
 }
@@ -449,7 +603,13 @@ export const formStats = (formId: string) => s().formStats(formId);
 export const getResponse = (id: string) => s().getResponse(id);
 export const saveResponse = (response: ResponseRecord, resumeHash: string) => s().saveResponse(response, resumeHash);
 export const listResponses = (formId: string) => s().listResponses(formId);
+export const queryResponses = (formId: string, q: ResponseQuery) => s().queryResponses(formId, q);
 export const deleteResponses = (formId: string, ids: string[]) => s().deleteResponses(formId, ids);
 export const saveFile = (file: StoredFile, data: Buffer) => s().saveFile(file, data);
 export const getFile = (id: string) => s().getFile(id);
 export const readStoredFile = (id: string) => s().readFile(id);
+export const createApiKey = (key: ApiKey) => s().createApiKey(key);
+export const listApiKeys = (userId: string) => s().listApiKeys(userId);
+export const getApiKeyByHash = (hash: string) => s().getApiKeyByHash(hash);
+export const revokeApiKey = (userId: string, id: string) => s().revokeApiKey(userId, id);
+export const touchApiKey = (id: string, at: string) => s().touchApiKey(id, at);
