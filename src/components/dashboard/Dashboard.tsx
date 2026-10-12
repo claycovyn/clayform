@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { Logo } from "@/components/Logo";
+import { Logo, LogoMark } from "@/components/Logo";
 import type { Form, FormStats } from "@/lib/types";
 
 type Listed = Form & { stats: FormStats };
@@ -30,13 +30,18 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
   return (
     <div className="min-h-screen">
       <header className="border-b border-ink/10 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <Link href="/">
-            <Logo size={30} />
+        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 sm:gap-3">
+          <Link href="/" className="shrink-0">
+            <span className="sm:hidden">
+              <LogoMark size={32} />
+            </span>
+            <span className="hidden sm:inline">
+              <Logo size={30} />
+            </span>
           </Link>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <button type="button" className="btn-outline" onClick={() => fileRef.current?.click()}>
-              Import JSON
+              Import<span className="hidden sm:inline"> JSON</span>
             </button>
             <input
               ref={fileRef}
@@ -55,7 +60,7 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
               }}
             />
             <button type="button" className="btn-brand" onClick={() => setPicking(true)}>
-              + New form
+              + New<span className="hidden sm:inline"> form</span>
             </button>
             {!openDev && (
               <button
@@ -84,7 +89,7 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
             {error}
           </p>
         )}
-        <div className="flex items-end justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-2">
           <h1 className="font-display text-3xl font-extrabold">Your forms</h1>
           <p className="text-sm text-ink-soft">Unlimited forms · unlimited responses</p>
         </div>

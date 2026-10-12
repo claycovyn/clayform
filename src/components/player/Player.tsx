@@ -680,7 +680,7 @@ export function Player({ form, preview = false, contained = false, embedded = fa
             )}
             {offline && <span className="opacity-70">Offline — saving on this device</span>}
             {form.settings.allowResume && !preview && answeredCount > 0 && screen.kind === "field" && (
-              <button type="button" onClick={copyResumeLink} className="underline-offset-2 opacity-70 hover:underline hover:opacity-100">
+              <button type="button" onClick={copyResumeLink} className="px-1 py-2 underline-offset-2 opacity-70 hover:underline hover:opacity-100">
                 {copied ? "Link copied ✓" : "Finish later"}
               </button>
             )}

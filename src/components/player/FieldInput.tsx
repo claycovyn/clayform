@@ -420,8 +420,9 @@ function Scale({ field, value, onChange, onSubmit, active, autoAdvance, owner }:
       <div
         role="radiogroup"
         aria-labelledby={`q-${field.id}`}
-        className={stars ? "flex flex-wrap gap-1" : "grid gap-1.5"}
-        style={stars ? undefined : { gridTemplateColumns: `repeat(${values.length}, minmax(0, 1fr))` }}
+        // Long scales (NPS) wrap into two rows on phones instead of shrinking to slivers.
+        className={stars ? "flex flex-wrap gap-1" : `grid gap-1.5 ${values.length > 6 ? "grid-cols-6 sm:[grid-template-columns:repeat(var(--steps),minmax(0,1fr))]" : "[grid-template-columns:repeat(var(--steps),minmax(0,1fr))]"}`}
+        style={stars ? undefined : ({ "--steps": values.length } as React.CSSProperties)}
         onMouseLeave={() => setHover(null)}
       >
         {values.map((v) => {

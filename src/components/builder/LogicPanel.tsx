@@ -148,7 +148,7 @@ export function LogicPanel({ form, update }: { form: Form; update: Update }) {
   const removeRule = (id: string) => update((f) => ({ ...f, logic: f.logic.filter((r) => r.id !== id) }));
 
   return (
-    <div className="order-1 flex-1 overflow-y-auto">
+    <div className="order-1 min-w-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl p-4 sm:p-8">
         <h2 className="font-display text-2xl font-extrabold">Logic</h2>
         <p className="mt-1 text-sm text-ink-soft">

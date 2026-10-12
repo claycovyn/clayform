@@ -63,7 +63,7 @@ export function SharePanel({ form, update, siteUrl }: { form: Form; update: Upda
   }
 
   return (
-    <div className="order-1 flex-1 overflow-y-auto">
+    <div className="order-1 min-w-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8">
         <div>
           <h2 className="font-display text-2xl font-extrabold">Share</h2>

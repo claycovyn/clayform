@@ -4,7 +4,7 @@ import { useState } from "react";
 import { isQuestion, plainText } from "@/lib/engine";
 import { choice, FIELD_TYPES, fieldMeta, newField, uid } from "@/lib/fields";
 import type { Choice, Field, FieldType, Form } from "@/lib/types";
-import type { Selection, Update } from "./Builder";
+import type { Pane, Selection, Update } from "./Builder";
 import { Labeled, NumberField, opt, Section, TextField, Toggle } from "./ui";
 
 const CHOICE_TYPES: FieldType[] = ["multiple_choice", "picture_choice", "dropdown", "ranking"];
@@ -491,7 +491,19 @@ function EndingSettings({ form, id, update, select }: { form: Form; id: string; 
   );
 }
 
-export function BuildPanel({ form, update, selected, setSelected }: { form: Form; update: Update; selected: Selection; setSelected: (s: Selection) => void }) {
+export function BuildPanel({
+  form,
+  update,
+  selected,
+  setSelected,
+  pane,
+}: {
+  form: Form;
+  update: Update;
+  selected: Selection;
+  setSelected: (s: Selection) => void;
+  pane: Pane;
+}) {
   const [adding, setAdding] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const selectedField = selected.startsWith("field:") ? form.fields.find((f) => f.id === selected.slice(6)) : undefined;
@@ -510,11 +522,11 @@ export function BuildPanel({ form, update, selected, setSelected }: { form: Form
   }
 
   const item = (sel: Selection, active: boolean) =>
-    `group flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition ${active ? "bg-white shadow-sm ring-1 ring-brand/40" : "hover:bg-white/70"}`;
+    `group flex w-full items-center gap-2 rounded-lg px-2 py-3 text-left text-sm transition lg:py-2 ${active ? "bg-white shadow-sm ring-1 ring-brand/40" : "hover:bg-white/70"}`;
 
   return (
     <>
-      <aside className="relative order-1 flex w-56 shrink-0 flex-col border-r border-ink/10 bg-mist/60 sm:w-64">
+      <aside className={`relative order-1 w-full shrink-0 flex-col border-r border-ink/10 bg-mist/60 lg:flex lg:w-64 ${pane === "list" ? "flex" : "hidden"}`}>
         <div className="relative p-2">
           <button type="button" className="btn-primary w-full" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
             + Add question
@@ -591,7 +603,7 @@ export function BuildPanel({ form, update, selected, setSelected }: { form: Form
           </div>
         </div>
       </aside>
-      <aside className="order-3 min-w-0 flex-1 overflow-y-auto border-l border-ink/10 bg-white lg:w-80 lg:flex-none">
+      <aside className={`order-3 min-w-0 flex-1 overflow-y-auto border-l border-ink/10 bg-white lg:block lg:w-80 lg:flex-none ${pane === "edit" ? "block" : "hidden"}`}>
         {selected === "welcome" && <WelcomeSettings form={form} update={update} />}
         {selectedField && <FieldSettings key={selectedField.id} form={form} field={selectedField} update={update} select={setSelected} />}
         {selected.startsWith("ending:") && <EndingSettings form={form} id={selected.slice(7)} update={update} select={setSelected} />}

@@ -64,11 +64,11 @@ export default function Home() {
 
       <main>
         <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-8 lg:grid-cols-[1.05fr_1fr] lg:pt-16">
-          <div>
+          <div className="min-w-0">
             <p className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand-dark">
               <span className="h-1.5 w-1.5 rounded-full bg-brand" /> Free forever · MIT licensed · Self-hosted
             </p>
-            <h1 className="mt-5 font-display text-5xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
+            <h1 className="mt-5 font-display text-[2.75rem] sm:text-5xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
               Forms people <span className="text-brand">actually finish.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-ink-soft">
@@ -83,11 +83,11 @@ export default function Home() {
                 ★ Star on GitHub
               </a>
             </div>
-            <pre className="mt-8 max-w-xl overflow-x-auto rounded-xl bg-ink p-4 text-sm text-paper">
+            <pre className="mt-8 max-w-xl overflow-x-auto rounded-xl bg-ink p-4 text-xs text-paper sm:text-sm">
               <code>{`git clone ${REPO}\ncd clayform && npm install\nnpm run dev`}</code>
             </pre>
           </div>
-          <div className="relative h-[520px] overflow-hidden rounded-3xl border border-ink/10 shadow-[0_30px_80px_-30px_rgba(27,23,20,0.35)]">
+          <div className="relative h-[480px] min-w-0 overflow-hidden rounded-3xl sm:h-[520px] border border-ink/10 shadow-[0_30px_80px_-30px_rgba(27,23,20,0.35)]">
             <Player form={demoForm()} preview contained />
           </div>
         </section>

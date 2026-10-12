@@ -37,14 +37,14 @@ function Color({ label, value, onChange }: { label: string; value: string; onCha
   );
 }
 
-export function DesignPanel({ form, update }: { form: Form; update: Update }) {
+export function DesignPanel({ form, update, hiddenOnPhone }: { form: Form; update: Update; hiddenOnPhone: boolean }) {
   const t = form.theme;
   const set = (patch: Partial<Theme>) => update((f) => ({ ...f, theme: { ...f.theme, ...patch, preset: patch.preset ?? "Custom" } }));
   const textContrast = /^#[0-9a-f]{6}$/i.test(t.bg) && /^#[0-9a-f]{6}$/i.test(t.text) ? contrast(t.bg, t.text) : 21;
   const buttonContrast = /^#[0-9a-f]{6}$/i.test(t.accent) && /^#[0-9a-f]{6}$/i.test(t.buttonText) ? contrast(t.accent, t.buttonText) : 21;
 
   return (
-    <aside className="order-1 w-full shrink-0 overflow-y-auto border-r border-ink/10 bg-white lg:w-80">
+    <aside className={`order-1 w-full shrink-0 overflow-y-auto border-r border-ink/10 bg-white lg:block lg:w-80 ${hiddenOnPhone ? "hidden" : "block"}`}>
       <Section title="Themes">
         <div className="grid grid-cols-2 gap-2">
           {THEME_PRESETS.map((p) => (

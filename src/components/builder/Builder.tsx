@@ -14,6 +14,7 @@ import { SharePanel } from "./SharePanel";
 
 export type Selection = "welcome" | `field:${string}` | `ending:${string}`;
 export type Update = (fn: (form: Form) => Form) => void;
+export type Pane = "list" | "edit" | "preview";
 
 const TABS = ["Build", "Logic", "Design", "Settings", "Share"] as const;
 type Tab = (typeof TABS)[number];
@@ -23,6 +24,8 @@ export function Builder({ initial, siteUrl }: { initial: Form; siteUrl: string }
   const [tab, setTab] = useState<Tab>("Build");
   const [selected, setSelected] = useState<Selection>(initial.fields[0] ? `field:${initial.fields[0].id}` : "welcome");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+  // Phones show one pane at a time; large screens show them side by side.
+  const [pane, setPane] = useState<Pane>("list");
   const [save, setSave] = useState<{ state: "saved" | "saving" | "error"; message?: string }>({ state: "saved" });
   const [problemsOpen, setProblemsOpen] = useState(false);
 
@@ -128,33 +131,33 @@ export function Builder({ initial, siteUrl }: { initial: Form; siteUrl: string }
 
   return (
     <div className="flex h-[100dvh] flex-col bg-mist/50">
-      <header className="flex flex-wrap items-center gap-3 border-b border-ink/10 bg-white px-3 py-2">
+      <header className="flex flex-wrap items-center gap-2 border-b border-ink/10 bg-white px-3 py-2 sm:gap-3">
         <Link href="/forms" className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-mist" title="All forms">
           <LogoMark size={28} />
           <span className="sr-only">All forms</span>
         </Link>
         <input
           aria-label="Form name"
-          className="min-w-0 max-w-[16rem] flex-1 rounded-md bg-transparent px-2 py-1 text-sm font-semibold outline-none hover:bg-mist focus:bg-mist"
+          className="min-w-0 max-w-[16rem] flex-1 rounded-md py-2 sm:py-1 bg-transparent px-2 py-1 text-sm font-semibold outline-none hover:bg-mist focus:bg-mist"
           value={form.title}
           onChange={(e) => update((f) => ({ ...f, title: e.target.value }))}
         />
-        <nav className="order-last flex w-full gap-1 overflow-x-auto md:order-none md:w-auto" aria-label="Builder sections">
+        <nav className="order-last -mx-1 flex w-[calc(100%+0.5rem)] justify-between gap-0.5 overflow-x-auto md:order-none md:mx-0 md:w-auto md:justify-start md:gap-1" aria-label="Builder sections">
           {TABS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === t ? "bg-ink text-paper" : "text-ink-soft hover:bg-mist"}`}
+              className={`shrink-0 rounded-lg px-2 py-2 text-[13px] font-medium transition sm:px-3 sm:py-1.5 sm:text-sm ${tab === t ? "bg-ink text-paper" : "text-ink-soft hover:bg-mist"}`}
             >
               {t}
             </button>
           ))}
-          <Link href={`/forms/${form.id}/results`} className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-mist">
+          <Link href={`/forms/${form.id}/results`} className="shrink-0 rounded-lg px-2 py-2 text-[13px] font-medium sm:px-3 sm:py-1.5 sm:text-sm text-ink-soft hover:bg-mist">
             Results
           </Link>
         </nav>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <div className="hidden items-center gap-1 sm:flex">
             <button type="button" className="btn-ghost px-2" onClick={undo} title="Undo (Ctrl/⌘ Z)" aria-label="Undo">
               ↶
@@ -163,11 +166,14 @@ export function Builder({ initial, siteUrl }: { initial: Form; siteUrl: string }
               ↷
             </button>
           </div>
-          <span className={`text-xs ${save.state === "error" ? "font-semibold text-red-600" : "text-ink-soft"}`} role="status">
+          <span className={`hidden text-xs sm:inline ${save.state === "error" ? "font-semibold text-red-600" : "text-ink-soft"}`} role="status">
             {save.state === "saving" ? "Saving…" : save.state === "error" ? save.message || "Not saved" : "Saved"}
           </span>
-          <a href={`/f/${form.slug}`} target="_blank" rel="noopener" className="btn-outline">
-            Open ↗
+          {save.state !== "saved" && (
+            <span className={`h-2 w-2 rounded-full sm:hidden ${save.state === "error" ? "bg-red-600" : "bg-brand"}`} title={save.message || "Saving"} />
+          )}
+          <a href={`/f/${form.slug}`} target="_blank" rel="noopener" className="btn-outline" aria-label="Open form in a new tab">
+            <span className="hidden sm:inline">Open</span> ↗
           </a>
           <button type="button" onClick={togglePublish} className={published ? "btn-outline" : "btn-brand"}>
             {published ? "Unpublish" : "Publish"}
@@ -193,16 +199,56 @@ export function Builder({ initial, siteUrl }: { initial: Form; siteUrl: string }
         </div>
       )}
 
+      {save.state === "error" && (
+        <p className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700 sm:hidden" role="alert">
+          Not saved: {save.message}
+        </p>
+      )}
+
+      {showPreview && (
+        <div className="flex gap-1 border-b border-ink/10 bg-white p-1.5 lg:hidden" role="tablist" aria-label="View">
+          {(tab === "Build"
+            ? ([["list", "Questions"], ["edit", "Edit"], ["preview", "Preview"]] as const)
+            : ([["edit", "Design"], ["preview", "Preview"]] as const)
+          ).map(([p, label]) => {
+            const on = pane === p || (tab === "Design" && p === "edit" && pane === "list");
+            return (
+              <button
+                key={p}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setPane(p)}
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold ${on ? "bg-brand text-white" : "text-ink-soft"}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1">
-        {tab === "Build" && <BuildPanel form={form} update={update} selected={selected} setSelected={setSelected} />}
+        {tab === "Build" && (
+          <BuildPanel
+            form={form}
+            update={update}
+            selected={selected}
+            setSelected={(s) => {
+              setSelected(s);
+              setPane("edit");
+            }}
+            pane={pane}
+          />
+        )}
         {tab === "Logic" && <LogicPanel form={form} update={update} />}
-        {tab === "Design" && <DesignPanel form={form} update={update} />}
+        {tab === "Design" && <DesignPanel form={form} update={update} hiddenOnPhone={pane === "preview"} />}
         {tab === "Settings" && <SettingsPanel form={form} update={update} />}
         {tab === "Share" && <SharePanel form={form} update={update} siteUrl={siteUrl} />}
 
         {showPreview && (
-          <div className="order-2 hidden min-w-0 flex-1 flex-col p-4 lg:flex">
-            <div className="mb-2 flex items-center justify-between text-xs text-ink-soft">
+          <div className={`order-2 min-w-0 flex-1 flex-col p-2 sm:p-4 lg:flex ${pane === "preview" ? "flex" : "hidden"}`}>
+            <div className="mb-2 hidden items-center justify-between text-xs text-ink-soft lg:flex">
               <span>Live preview — answers aren&apos;t saved</span>
               <div className="flex gap-1 rounded-lg bg-white p-0.5">
                 {(["desktop", "mobile"] as const).map((d) => (
@@ -219,7 +265,7 @@ export function Builder({ initial, siteUrl }: { initial: Form; siteUrl: string }
             </div>
             <div
               className={`relative mx-auto w-full flex-1 overflow-hidden rounded-2xl border border-ink/10 shadow-sm transition-all ${
-                device === "mobile" ? "max-w-[390px]" : ""
+                device === "mobile" ? "lg:max-w-[390px]" : ""
               }`}
             >
               <Player key={`${focus}-${form.settings.mode}`} form={form} preview contained focus={focus} />
