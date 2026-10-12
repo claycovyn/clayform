@@ -51,7 +51,7 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
-        <Logo size={32} blink />
+        <Logo size={32} spin />
         <nav className="flex items-center gap-2">
           <a href={REPO} className="btn-ghost hidden sm:inline-flex">
             GitHub
@@ -65,25 +65,25 @@ export default function Home() {
       <main>
         <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-8 lg:grid-cols-[1.05fr_1fr] lg:pt-16">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full bg-clay/10 px-3 py-1 text-xs font-semibold text-clay-dark">
-              <span className="h-1.5 w-1.5 rounded-full bg-clay" /> Free forever · MIT licensed · Self-hosted
+            <p className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand-dark">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand" /> Free forever · MIT licensed · Self-hosted
             </p>
-            <h1 className="mt-5 font-display text-5xl font-bold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
-              Forms people <span className="text-clay">actually finish.</span>
+            <h1 className="mt-5 font-display text-5xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
+              Forms people <span className="text-brand">actually finish.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-ink-soft">
               Clayform is a beautiful, conversational form builder you own. One question at a time, logic, scoring, file uploads and real analytics — with no
               response caps, no paywalled features and no monthly bill.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/forms" className="btn-clay px-6 py-3 text-base">
+              <Link href="/forms" className="btn-brand px-6 py-3 text-base">
                 Build a form →
               </Link>
               <a href={REPO} className="btn-outline px-6 py-3 text-base">
                 ★ Star on GitHub
               </a>
             </div>
-            <pre className="mt-8 max-w-xl overflow-x-auto rounded-xl bg-ink p-4 text-sm text-cream">
+            <pre className="mt-8 max-w-xl overflow-x-auto rounded-xl bg-ink p-4 text-sm text-paper">
               <code>{`git clone ${REPO}\ncd clayform && npm install\nnpm run dev`}</code>
             </pre>
           </div>
@@ -94,7 +94,7 @@ export default function Home() {
 
         <section className="border-y border-ink/10 bg-white">
           <div className="mx-auto max-w-6xl px-4 py-16">
-            <h2 className="max-w-2xl font-display text-4xl font-bold tracking-tight">Built from the complaints.</h2>
+            <h2 className="max-w-2xl font-display text-4xl font-extrabold tracking-tight">Built from the complaints.</h2>
             <p className="mt-3 max-w-2xl text-ink-soft">
               We read the reviews of the big paid form builders. The same things come up again and again: price jumps, response limits that stop forms
               mid-campaign, useful features behind higher tiers, thin reporting, clunky exports. Clayform fixes each one.
@@ -103,7 +103,7 @@ export default function Home() {
               {FEATURES.map(([title, body]) => (
                 <div key={title}>
                   <h3 className="flex items-center gap-2 font-semibold">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-clay text-[11px] text-white">✓</span>
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] text-white">✓</span>
                     {title}
                   </h3>
                   <p className="mt-1.5 text-sm text-ink-soft">{body}</p>
@@ -121,23 +121,23 @@ export default function Home() {
               ["Embed anywhere", "Inline, popup or plain iframe, with hidden fields and a submit event for your own code. One script tag."],
             ].map(([t, b]) => (
               <div key={t} className="card p-6">
-                <h3 className="font-display text-xl font-bold">{t}</h3>
+                <h3 className="font-display text-xl font-extrabold">{t}</h3>
                 <p className="mt-2 text-sm text-ink-soft">{b}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="bg-ink text-cream">
+        <section className="bg-ink text-paper">
           <div className="mx-auto flex max-w-6xl flex-col items-center px-4 py-20 text-center">
-            <LogoMark size={64} blink />
-            <h2 className="mt-6 font-display text-4xl font-bold tracking-tight sm:text-5xl">Your forms. Your data. $0.</h2>
-            <p className="mt-4 max-w-xl text-cream/70">Run it on a $5 server, a Raspberry Pi or your laptop. One command with Docker. Contributions welcome.</p>
+            <LogoMark size={64} spin />
+            <h2 className="mt-6 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Your forms. Your data. $0.</h2>
+            <p className="mt-4 max-w-xl text-paper/70">Run it on a $5 server, a Raspberry Pi or your laptop. One command with Docker. Contributions welcome.</p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link href="/forms" className="btn-clay px-6 py-3 text-base">
+              <Link href="/forms" className="btn-brand px-6 py-3 text-base">
                 Start building
               </Link>
-              <a href={REPO} className="btn px-6 py-3 text-base text-cream ring-1 ring-cream/30 hover:bg-cream/10">
+              <a href={REPO} className="btn px-6 py-3 text-base text-paper ring-1 ring-paper/30 hover:bg-paper/10">
                 Read the docs
               </a>
             </div>

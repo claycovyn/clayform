@@ -28,7 +28,7 @@ export function LoginForm() {
         <input className="field" type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
       </label>
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-      <button type="submit" className="btn-clay w-full" disabled={busy || !password}>
+      <button type="submit" className="btn-brand w-full" disabled={busy || !password}>
         {busy ? "Signing in…" : "Sign in"}
       </button>
     </form>

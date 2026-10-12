@@ -127,15 +127,15 @@ export function Builder({ initial, siteUrl }: { initial: Form; siteUrl: string }
   const showPreview = tab === "Build" || tab === "Design";
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-sand/50">
+    <div className="flex h-[100dvh] flex-col bg-mist/50">
       <header className="flex flex-wrap items-center gap-3 border-b border-ink/10 bg-white px-3 py-2">
-        <Link href="/forms" className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-sand" title="All forms">
+        <Link href="/forms" className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-mist" title="All forms">
           <LogoMark size={28} />
           <span className="sr-only">All forms</span>
         </Link>
         <input
           aria-label="Form name"
-          className="min-w-0 max-w-[16rem] flex-1 rounded-md bg-transparent px-2 py-1 text-sm font-semibold outline-none hover:bg-sand focus:bg-sand"
+          className="min-w-0 max-w-[16rem] flex-1 rounded-md bg-transparent px-2 py-1 text-sm font-semibold outline-none hover:bg-mist focus:bg-mist"
           value={form.title}
           onChange={(e) => update((f) => ({ ...f, title: e.target.value }))}
         />
@@ -145,12 +145,12 @@ export function Builder({ initial, siteUrl }: { initial: Form; siteUrl: string }
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === t ? "bg-ink text-cream" : "text-ink-soft hover:bg-sand"}`}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === t ? "bg-ink text-paper" : "text-ink-soft hover:bg-mist"}`}
             >
               {t}
             </button>
           ))}
-          <Link href={`/forms/${form.id}/results`} className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-sand">
+          <Link href={`/forms/${form.id}/results`} className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-mist">
             Results
           </Link>
         </nav>
@@ -169,14 +169,14 @@ export function Builder({ initial, siteUrl }: { initial: Form; siteUrl: string }
           <a href={`/f/${form.slug}`} target="_blank" rel="noopener" className="btn-outline">
             Open ↗
           </a>
-          <button type="button" onClick={togglePublish} className={published ? "btn-outline" : "btn-clay"}>
+          <button type="button" onClick={togglePublish} className={published ? "btn-outline" : "btn-brand"}>
             {published ? "Unpublish" : "Publish"}
           </button>
         </div>
       </header>
 
       {problemsOpen && problems.length > 0 && (
-        <div className="border-b border-clay/30 bg-clay-light/40 px-4 py-3 text-sm" role="alert">
+        <div className="border-b border-brand/30 bg-brand-light/40 px-4 py-3 text-sm" role="alert">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="font-semibold">Fix these before publishing:</p>
@@ -210,7 +210,7 @@ export function Builder({ initial, siteUrl }: { initial: Form; siteUrl: string }
                     key={d}
                     type="button"
                     onClick={() => setDevice(d)}
-                    className={`rounded-md px-2 py-1 capitalize ${device === d ? "bg-ink text-cream" : ""}`}
+                    className={`rounded-md px-2 py-1 capitalize ${device === d ? "bg-ink text-paper" : ""}`}
                   >
                     {d}
                   </button>

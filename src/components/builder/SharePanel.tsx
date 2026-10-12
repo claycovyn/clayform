@@ -28,7 +28,7 @@ function Copy({ text, label = "Copy" }: { text: string; label?: string }) {
 function Code({ code }: { code: string }) {
   return (
     <div className="relative">
-      <pre className="overflow-x-auto rounded-xl bg-ink p-4 pr-24 text-xs leading-relaxed text-cream">
+      <pre className="overflow-x-auto rounded-xl bg-ink p-4 pr-24 text-xs leading-relaxed text-paper">
         <code>{code}</code>
       </pre>
       <div className="absolute right-2 top-2">
@@ -66,9 +66,9 @@ export function SharePanel({ form, update, siteUrl }: { form: Form; update: Upda
     <div className="order-1 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8">
         <div>
-          <h2 className="font-display text-2xl font-bold">Share</h2>
+          <h2 className="font-display text-2xl font-extrabold">Share</h2>
           {form.status !== "published" && (
-            <p className="mt-2 rounded-xl bg-clay-light/40 p-3 text-sm">
+            <p className="mt-2 rounded-xl bg-brand-light/40 p-3 text-sm">
               This form is a <b>draft</b>. Hit <b>Publish</b> (top right) before you share it — until then only you can open it.
             </p>
           )}
@@ -113,7 +113,7 @@ export function SharePanel({ form, update, siteUrl }: { form: Form; update: Upda
 
         <section className="card p-5">
           <h3 className="font-semibold">Embed on your site</h3>
-          <div className="mt-3 flex gap-1 rounded-lg bg-sand p-1 text-sm">
+          <div className="mt-3 flex gap-1 rounded-lg bg-mist p-1 text-sm">
             {(["inline", "popup", "iframe"] as const).map((k) => (
               <button key={k} type="button" onClick={() => setEmbed(k)} className={`flex-1 rounded-md px-3 py-1.5 capitalize ${embed === k ? "bg-white font-semibold shadow-sm" : ""}`}>
                 {k === "iframe" ? "Plain iframe" : k}
@@ -124,7 +124,7 @@ export function SharePanel({ form, update, siteUrl }: { form: Form; update: Upda
             <Code code={snippets[embed]} />
           </div>
           <p className="mt-2 text-xs text-ink-soft">
-            Listen for completions with <code className="rounded bg-sand px-1">window.addEventListener(&quot;message&quot;, e =&gt; e.data.type === &quot;clayform:submit&quot;)</code>.
+            Listen for completions with <code className="rounded bg-mist px-1">window.addEventListener(&quot;message&quot;, e =&gt; e.data.type === &quot;clayform:submit&quot;)</code>.
           </p>
         </section>
 

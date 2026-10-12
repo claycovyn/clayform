@@ -27,8 +27,8 @@ function Bar({ label, count, total, highlight }: { label: string; count: number;
           {count} · {pct(count, total)}%
         </span>
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-sand">
-        <div className={`h-full rounded-full ${highlight ? "bg-clay" : "bg-ink/70"}`} style={{ width: `${pct(count, total)}%` }} />
+      <div className="h-2.5 overflow-hidden rounded-full bg-mist">
+        <div className={`h-full rounded-full ${highlight ? "bg-brand" : "bg-ink/70"}`} style={{ width: `${pct(count, total)}%` }} />
       </div>
     </div>
   );
@@ -69,7 +69,7 @@ function FieldSummary({ field, responses }: { field: Field; responses: ResponseR
         {avg.map((a, i) => (
           <li key={a.label} className="flex justify-between">
             <span>
-              <b className="mr-2 text-clay-dark">{i + 1}</b>
+              <b className="mr-2 text-brand-dark">{i + 1}</b>
               {a.label}
             </span>
             <span className="text-ink-soft">avg. position {Number.isFinite(a.avg) ? a.avg.toFixed(1) : "—"}</span>
@@ -87,12 +87,12 @@ function FieldSummary({ field, responses }: { field: Field; responses: ResponseR
         <div className="flex flex-wrap gap-6">
           {nps !== null && (
             <div>
-              <div className="font-display text-4xl font-bold text-clay-dark">{nps > 0 ? `+${nps}` : nps}</div>
+              <div className="font-display text-4xl font-extrabold text-brand-dark">{nps > 0 ? `+${nps}` : nps}</div>
               <div className="text-xs text-ink-soft">NPS</div>
             </div>
           )}
           <div>
-            <div className="font-display text-4xl font-bold">{nums.length ? mean.toFixed(1) : "—"}</div>
+            <div className="font-display text-4xl font-extrabold">{nums.length ? mean.toFixed(1) : "—"}</div>
             <div className="text-xs text-ink-soft">average</div>
           </div>
           {nps !== null && (
@@ -115,7 +115,7 @@ function FieldSummary({ field, responses }: { field: Field; responses: ResponseR
               const n = nums.filter((x) => x === v).length;
               return (
                 <div key={v} className="flex flex-1 flex-col items-center gap-1">
-                  <div className="w-full rounded-t bg-clay/80" style={{ height: `${Math.max(pct(n, nums.length), 2) * 0.8}px` }} title={`${v}: ${n}`} />
+                  <div className="w-full rounded-t bg-brand/80" style={{ height: `${Math.max(pct(n, nums.length), 2) * 0.8}px` }} title={`${v}: ${n}`} />
                   <span className="text-[11px] text-ink-soft">{v}</span>
                 </div>
               );
@@ -138,7 +138,7 @@ function FieldSummary({ field, responses }: { field: Field; responses: ResponseR
     body = (
       <ul className="max-h-60 space-y-1.5 overflow-auto text-sm">
         {values.slice(0, 50).map((v, i) => (
-          <li key={i} className="rounded-lg bg-sand/60 px-3 py-2">
+          <li key={i} className="rounded-lg bg-mist/60 px-3 py-2">
             {displayValue(v)}
           </li>
         ))}
@@ -164,7 +164,7 @@ function Cell({ value }: { value: unknown }) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const f = value as FileAnswer;
     return (
-      <a className="text-clay-dark underline" href={`/api/files/${f.fileId}`}>
+      <a className="text-brand-dark underline" href={`/api/files/${f.fileId}`}>
         {f.name}
       </a>
     );
@@ -211,7 +211,7 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
   const funnel = questions.map((q) => ({ field: q, reached: responses.filter((r) => !isEmpty(r.answers[q.ref])).length }));
 
   return (
-    <div className="min-h-screen bg-sand/40">
+    <div className="min-h-screen bg-mist/40">
       <header className="flex flex-wrap items-center gap-3 border-b border-ink/10 bg-white px-4 py-3">
         <Link href="/forms" title="All forms">
           <LogoMark size={28} />
@@ -244,7 +244,7 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
           ].map(([label, value]) => (
             <div key={label} className="card p-4">
               <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{label}</div>
-              <div className="mt-1 font-display text-3xl font-bold tabular-nums">{value}</div>
+              <div className="mt-1 font-display text-3xl font-extrabold tabular-nums">{value}</div>
             </div>
           ))}
         </div>
@@ -257,7 +257,7 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
               ["dropoff", "Drop-off"],
             ] as const
           ).map(([t, label]) => (
-            <button key={t} type="button" onClick={() => setTab(t)} className={`flex-1 rounded-lg px-4 py-1.5 font-medium sm:flex-none ${tab === t ? "bg-ink text-cream" : "text-ink-soft hover:bg-sand"}`}>
+            <button key={t} type="button" onClick={() => setTab(t)} className={`flex-1 rounded-lg px-4 py-1.5 font-medium sm:flex-none ${tab === t ? "bg-ink text-paper" : "text-ink-soft hover:bg-mist"}`}>
               {label}
             </button>
           ))}
@@ -294,7 +294,7 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
                 return (
                   <div key={field.id}>
                     <Bar label={`${i + 1}. ${plainText(field.title) || field.ref}`} count={reached} total={Math.max(stats.views, stats.starts, 1)} highlight={lost > 0 && lost === Math.max(...funnel.map((f, j) => (j === 0 ? stats.starts : funnel[j - 1].reached) - f.reached))} />
-                    {lost > 0 && field.required && <p className="mt-0.5 text-xs text-clay-dark">−{lost} here</p>}
+                    {lost > 0 && field.required && <p className="mt-0.5 text-xs text-brand-dark">−{lost} here</p>}
                   </div>
                 );
               })}
@@ -321,7 +321,7 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
             </div>
             <div className="card overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-ink/10 bg-sand/50 text-xs uppercase tracking-wide text-ink-soft">
+                <thead className="border-b border-ink/10 bg-mist/50 text-xs uppercase tracking-wide text-ink-soft">
                   <tr>
                     <th className="w-8 p-3">
                       <input
@@ -341,7 +341,7 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
                 </thead>
                 <tbody>
                   {shown.map((r) => (
-                    <tr key={r.id} className="cursor-pointer border-b border-ink/5 hover:bg-sand/40" onClick={() => setOpen(r)}>
+                    <tr key={r.id} className="cursor-pointer border-b border-ink/5 hover:bg-mist/40" onClick={() => setOpen(r)}>
                       <td className="p-3" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
@@ -357,7 +357,7 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
                       </td>
                       <td className="whitespace-nowrap p-3 text-ink-soft">
                         {new Date(r.completedAt ?? r.updatedAt).toLocaleString()}
-                        {!r.completedAt && <span className="ml-2 rounded bg-clay-light/60 px-1.5 py-0.5 text-[10px] font-semibold text-clay-dark">partial</span>}
+                        {!r.completedAt && <span className="ml-2 rounded bg-brand-light/60 px-1.5 py-0.5 text-[10px] font-semibold text-brand-dark">partial</span>}
                       </td>
                       {questions.slice(0, 6).map((q) => (
                         <td key={q.id} className="max-w-[12rem] truncate p-3">
@@ -406,7 +406,7 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
                 </div>
               ))}
             </dl>
-            <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl bg-sand/50 p-3 text-xs text-ink-soft">
+            <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl bg-mist/50 p-3 text-xs text-ink-soft">
               <span>Score: {open.score}</span>
               <span>Time: {duration(open.meta.durationMs)}</span>
               <span className="col-span-2">Ending: {form.endings.find((e) => e.id === open.endingId)?.title ? plainText(form.endings.find((e) => e.id === open.endingId)!.title) : "—"}</span>

@@ -83,7 +83,7 @@ export function newField(type: FieldType, existing: Field[] = []): Field {
 }
 
 export const THEME_PRESETS: Theme[] = [
-  { preset: "Clay", bg: "#FBF6EE", text: "#1B1714", accent: "#D4683F", buttonText: "#FFFFFF", font: "sans", radius: 12, align: "left" },
+  { preset: "Cobalt", bg: "#FFFFFF", text: "#0B0B12", accent: "#2F5BFF", buttonText: "#FFFFFF", font: "sans", radius: 12, align: "left" },
   { preset: "Midnight", bg: "#12131A", text: "#F4F1EA", accent: "#9B8CFF", buttonText: "#12131A", font: "sans", radius: 14, align: "left" },
   { preset: "Paper", bg: "#FFFFFF", text: "#111111", accent: "#111111", buttonText: "#FFFFFF", font: "serif", radius: 4, align: "left" },
   { preset: "Moss", bg: "#E9EFE4", text: "#1E2B1F", accent: "#3F6B45", buttonText: "#FFFFFF", font: "rounded", radius: 20, align: "left" },
@@ -102,7 +102,7 @@ export const FONT_STACKS: Record<Theme["font"], string> = {
 };
 
 export const GOOGLE_FONTS_HREF =
-  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Nunito:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap";
+  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@600;700;800&family=JetBrains+Mono:wght@400;600&family=Nunito:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap";
 
 export function blankForm(title = "Untitled form"): Form {
   const now = new Date().toISOString();

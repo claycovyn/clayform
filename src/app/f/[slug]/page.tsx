@@ -42,7 +42,7 @@ export default async function FormPage({ params, searchParams }: Props) {
   return (
     <>
       {draftPreview && (
-        <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-1.5 text-xs font-semibold text-cream shadow">
+        <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-1.5 text-xs font-semibold text-paper shadow">
           Draft preview — answers aren&apos;t saved. Publish to share.
         </div>
       )}

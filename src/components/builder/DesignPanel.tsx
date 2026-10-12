@@ -52,7 +52,7 @@ export function DesignPanel({ form, update }: { form: Form; update: Update }) {
               key={p.preset}
               type="button"
               onClick={() => update((f) => ({ ...f, theme: { ...p, backgroundImage: f.theme.backgroundImage } }))}
-              className={`overflow-hidden rounded-xl border text-left transition ${t.preset === p.preset ? "border-clay ring-2 ring-clay/30" : "border-ink/10 hover:border-ink/30"}`}
+              className={`overflow-hidden rounded-xl border text-left transition ${t.preset === p.preset ? "border-brand ring-2 ring-brand/30" : "border-ink/10 hover:border-ink/30"}`}
             >
               <div className="p-3" style={{ background: p.bg, color: p.text, fontFamily: FONT_STACKS[p.font] }}>
                 <div className="text-sm font-semibold">Question?</div>
@@ -71,7 +71,7 @@ export function DesignPanel({ form, update }: { form: Form; update: Update }) {
         <Color label="Accent / buttons" value={t.accent} onChange={(v) => set({ accent: v })} />
         <Color label="Button text" value={t.buttonText} onChange={(v) => set({ buttonText: v })} />
         {(textContrast < 4.5 || buttonContrast < 3) && (
-          <p className="rounded-lg bg-clay-light/40 p-2 text-xs" role="alert">
+          <p className="rounded-lg bg-brand-light/40 p-2 text-xs" role="alert">
             ⚠ Low contrast ({(textContrast < 4.5 ? textContrast : buttonContrast).toFixed(1)}:1). Some people won&apos;t be able to read this. Aim for 4.5:1 for text.
           </p>
         )}
@@ -87,7 +87,7 @@ export function DesignPanel({ form, update }: { form: Form; update: Update }) {
           </select>
         </Labeled>
         <Labeled label={`Corner radius · ${t.radius}px`}>
-          <input type="range" min={0} max={32} value={t.radius} onChange={(e) => set({ radius: Number(e.target.value) })} className="w-full accent-[#D4683F]" />
+          <input type="range" min={0} max={32} value={t.radius} onChange={(e) => set({ radius: Number(e.target.value) })} className="w-full accent-[#2F5BFF]" />
         </Labeled>
         <Labeled label="Welcome & ending alignment">
           <select className="field" value={t.align} onChange={(e) => set({ align: e.target.value as Theme["align"] })}>

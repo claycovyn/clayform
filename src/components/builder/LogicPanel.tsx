@@ -66,7 +66,7 @@ function RuleEditor({ form, field, rule, change, remove }: { form: Form; field: 
             <div key={i} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="w-10 shrink-0 text-xs font-bold uppercase text-ink-soft">
                 {i === 0 ? "If" : (
-                  <button type="button" className="rounded bg-sand px-1.5 py-0.5 hover:bg-clay-light" onClick={() => change({ ...rule, match: rule.match === "all" ? "any" : "all" })} title="Switch between AND / OR">
+                  <button type="button" className="rounded bg-mist px-1.5 py-0.5 hover:bg-brand-light" onClick={() => change({ ...rule, match: rule.match === "all" ? "any" : "all" })} title="Switch between AND / OR">
                     {rule.match === "all" ? "and" : "or"}
                   </button>
                 )}
@@ -111,7 +111,7 @@ function RuleEditor({ form, field, rule, change, remove }: { form: Form; field: 
         })}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-ink/5 pt-3 text-sm">
-        <span className="w-10 shrink-0 text-xs font-bold uppercase text-clay-dark">Then</span>
+        <span className="w-10 shrink-0 text-xs font-bold uppercase text-brand-dark">Then</span>
         <span>go to</span>
         <select className="field w-auto max-w-[16rem] py-1.5" value={rule.goTo} onChange={(e) => change({ ...rule, goTo: e.target.value })}>
           {targets.map((f) => (
@@ -128,7 +128,7 @@ function RuleEditor({ form, field, rule, change, remove }: { form: Form; field: 
         <div className="ml-auto flex gap-2">
           <button
             type="button"
-            className="text-xs font-semibold text-clay-dark hover:underline"
+            className="text-xs font-semibold text-brand-dark hover:underline"
             onClick={() => change({ ...rule, conditions: [...rule.conditions, { source: { kind: "field", ref: field.ref }, op: "is", value: "" }] })}
           >
             + condition
@@ -150,12 +150,12 @@ export function LogicPanel({ form, update }: { form: Form; update: Update }) {
   return (
     <div className="order-1 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl p-4 sm:p-8">
-        <h2 className="font-display text-2xl font-bold">Logic</h2>
+        <h2 className="font-display text-2xl font-extrabold">Logic</h2>
         <p className="mt-1 text-sm text-ink-soft">
           Send people to different questions or endings based on their answers, hidden fields or score. Rules are checked top to bottom when someone leaves a question; the first match wins. No match means the next question.
         </p>
         {problems.length > 0 && (
-          <ul className="mt-4 rounded-xl bg-clay-light/40 p-3 text-sm" role="alert">
+          <ul className="mt-4 rounded-xl bg-brand-light/40 p-3 text-sm" role="alert">
             {problems.map((p) => (
               <li key={p}>⚠ {p}</li>
             ))}
@@ -168,7 +168,7 @@ export function LogicPanel({ form, update }: { form: Form; update: Update }) {
             return (
               <li key={field.id} className="relative">
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-bold text-cream">{i + 1}</span>
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-bold text-paper">{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{plainText(field.title) || <span className="text-ink-soft">Untitled</span>}</p>
                     <div className="mt-2 space-y-2">
@@ -183,7 +183,7 @@ export function LogicPanel({ form, update }: { form: Form; update: Update }) {
                       {isQuestion(field) && (
                         <button
                           type="button"
-                          className="font-semibold text-clay-dark hover:underline"
+                          className="font-semibold text-brand-dark hover:underline"
                           onClick={() =>
                             update((f) => ({
                               ...f,

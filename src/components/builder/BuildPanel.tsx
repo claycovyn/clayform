@@ -49,9 +49,9 @@ function AddFieldMenu({ onAdd, onClose }: { onAdd: (t: FieldType) => void; onClo
                 key={m.type}
                 type="button"
                 onClick={() => onAdd(m.type)}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-sand"
+                className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-mist"
               >
-                <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded-md bg-clay/10 text-xs font-bold text-clay-dark">
+                <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded-md bg-brand/10 text-xs font-bold text-brand-dark">
                   {m.glyph}
                 </span>
                 <span>
@@ -107,7 +107,7 @@ function ChoicesEditor({ field, change }: { field: Field; change: (patch: Partia
         <span className="label mb-0">Options</span>
         <button
           type="button"
-          className="text-xs font-semibold text-clay-dark hover:underline"
+          className="text-xs font-semibold text-brand-dark hover:underline"
           onClick={() => {
             setBulkText(choices.map((c) => c.label).join("\n"));
             setBulk(true);
@@ -117,7 +117,7 @@ function ChoicesEditor({ field, change }: { field: Field; change: (patch: Partia
         </button>
       </div>
       {choices.map((c, i) => (
-        <div key={c.id} className="rounded-lg border border-ink/10 bg-sand/30 p-1.5">
+        <div key={c.id} className="rounded-lg border border-ink/10 bg-mist/30 p-1.5">
           <div className="flex items-center gap-1">
             <input
               className="field flex-1 py-1.5"
@@ -221,7 +221,7 @@ function FieldSettings({ form, field, update, select }: { form: Form; field: Fie
                   <button
                     key={t}
                     type="button"
-                    className="rounded bg-sand px-1.5 py-0.5 font-mono text-[11px] hover:bg-clay-light"
+                    className="rounded bg-mist px-1.5 py-0.5 font-mono text-[11px] hover:bg-brand-light"
                     onClick={() => change({ title: `${field.title}{{${t}}}` })}
                   >
                     {`{{${t}}}`}
@@ -297,7 +297,7 @@ function FieldSettings({ form, field, update, select }: { form: Form; field: Fie
               max={field.type === "rating" ? 10 : 11}
               value={field.steps ?? 5}
               onChange={(e) => change({ steps: Number(e.target.value) })}
-              className="w-full accent-[#D4683F]"
+              className="w-full accent-[#2F5BFF]"
             />
             <span className="text-xs text-ink-soft">{field.steps ?? 5}</span>
           </Labeled>
@@ -510,11 +510,11 @@ export function BuildPanel({ form, update, selected, setSelected }: { form: Form
   }
 
   const item = (sel: Selection, active: boolean) =>
-    `group flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition ${active ? "bg-white shadow-sm ring-1 ring-clay/40" : "hover:bg-white/70"}`;
+    `group flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition ${active ? "bg-white shadow-sm ring-1 ring-brand/40" : "hover:bg-white/70"}`;
 
   return (
     <>
-      <aside className="relative order-1 flex w-56 shrink-0 flex-col border-r border-ink/10 bg-sand/60 sm:w-64">
+      <aside className="relative order-1 flex w-56 shrink-0 flex-col border-r border-ink/10 bg-mist/60 sm:w-64">
         <div className="relative p-2">
           <button type="button" className="btn-primary w-full" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
             + Add question
@@ -552,7 +552,7 @@ export function BuildPanel({ form, update, selected, setSelected }: { form: Form
                 className={`${item(`field:${f.id}`, selected === `field:${f.id}`)} ${dragId === f.id ? "opacity-50" : ""}`}
                 onClick={() => setSelected(`field:${f.id}`)}
               >
-                <span className="flex h-6 w-8 shrink-0 items-center justify-center rounded bg-clay/10 text-[10px] font-bold text-clay-dark" title={meta.label}>
+                <span className="flex h-6 w-8 shrink-0 items-center justify-center rounded bg-brand/10 text-[10px] font-bold text-brand-dark" title={meta.label}>
                   {meta.glyph}
                 </span>
                 <span className="min-w-0 flex-1 truncate">
@@ -560,11 +560,11 @@ export function BuildPanel({ form, update, selected, setSelected }: { form: Form
                   {plainText(f.title) || <span className="text-ink-soft">{meta.label}</span>}
                 </span>
                 {hasLogic && (
-                  <span className="text-[10px] text-clay-dark" title="Has logic">
+                  <span className="text-[10px] text-brand-dark" title="Has logic">
                     ⑂
                   </span>
                 )}
-                {f.required && <span className="text-clay">*</span>}
+                {f.required && <span className="text-brand">*</span>}
               </button>
             );
           })}
@@ -579,7 +579,7 @@ export function BuildPanel({ form, update, selected, setSelected }: { form: Form
             ))}
             <button
               type="button"
-              className="mt-1 w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-clay-dark hover:bg-white/70"
+              className="mt-1 w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-brand-dark hover:bg-white/70"
               onClick={() => {
                 const ending = { id: uid(6), title: "Thanks!" };
                 update((f) => ({ ...f, endings: [...f.endings, ending] }));

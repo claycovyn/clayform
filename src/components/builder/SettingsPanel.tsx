@@ -25,7 +25,7 @@ export function SettingsPanel({ form, update }: { form: Form; update: Update }) 
   return (
     <div className="order-1 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-2xl p-4 sm:p-8">
-        <h2 className="font-display text-2xl font-bold">Settings</h2>
+        <h2 className="font-display text-2xl font-extrabold">Settings</h2>
         <div className="card mt-6 overflow-hidden">
           <Section title="Layout">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -39,7 +39,7 @@ export function SettingsPanel({ form, update }: { form: Form; update: Update }) 
                   key={mode}
                   type="button"
                   onClick={() => set({ mode })}
-                  className={`rounded-xl border p-3 text-left transition ${s.mode === mode ? "border-clay bg-clay/5 ring-2 ring-clay/20" : "border-ink/10 hover:border-ink/30"}`}
+                  className={`rounded-xl border p-3 text-left transition ${s.mode === mode ? "border-brand bg-brand/5 ring-2 ring-brand/20" : "border-ink/10 hover:border-ink/30"}`}
                 >
                   <span className="block text-sm font-semibold">{title}</span>
                   <span className="block text-xs text-ink-soft">{hint}</span>
@@ -79,11 +79,11 @@ export function SettingsPanel({ form, update }: { form: Form; update: Update }) 
 
           <Section title="Hidden fields">
             <p className="text-xs text-ink-soft">
-              Pass data in the link, like <code className="rounded bg-sand px-1">?source=newsletter</code>. Saved with each response, usable in logic and recall.
+              Pass data in the link, like <code className="rounded bg-mist px-1">?source=newsletter</code>. Saved with each response, usable in logic and recall.
             </p>
             <div className="flex flex-wrap gap-2">
               {form.hiddenFields.map((h) => (
-                <span key={h} className="inline-flex items-center gap-1 rounded-full bg-sand px-2.5 py-1 font-mono text-xs">
+                <span key={h} className="inline-flex items-center gap-1 rounded-full bg-mist px-2.5 py-1 font-mono text-xs">
                   {h}
                   <button type="button" aria-label={`Remove ${h}`} className="text-ink-soft hover:text-red-600" onClick={() => update((f) => ({ ...f, hiddenFields: f.hiddenFields.filter((x) => x !== h) }))}>
                     ×
@@ -111,7 +111,7 @@ export function SettingsPanel({ form, update }: { form: Form; update: Update }) 
           <Section title="Webhook">
             <p className="text-xs text-ink-soft">
               We POST every completed response as JSON. Connect Zapier, Make, n8n, Slack, your CRM or your own code. With a secret, each request carries an{" "}
-              <code className="rounded bg-sand px-1">X-Clayform-Signature: sha256=…</code> HMAC header.
+              <code className="rounded bg-mist px-1">X-Clayform-Signature: sha256=…</code> HMAC header.
             </p>
             <Labeled label="URL">
               <TextField value={s.webhookUrl} onChange={(v) => set({ webhookUrl: opt(v) })} placeholder="https://hooks.example.com/…" />

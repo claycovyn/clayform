@@ -5,14 +5,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        clay: { DEFAULT: "#D4683F", dark: "#B4532E", light: "#F2C9B4" },
-        cream: "#FBF6EE",
-        sand: "#EFE5D6",
-        ink: { DEFAULT: "#1B1714", soft: "#5B524B" },
+        brand: { DEFAULT: "#2F5BFF", dark: "#1E44E6", light: "#C9D5FF" },
+        paper: "#F7F8FC",
+        mist: "#EBEEF6",
+        ink: { DEFAULT: "#0B0B12", soft: "#5A5D6E" },
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
-        display: ["Fraunces", "ui-serif", "Georgia", "serif"],
+        display: ["'Inter Tight'", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },

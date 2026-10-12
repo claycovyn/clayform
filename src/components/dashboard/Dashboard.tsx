@@ -54,7 +54,7 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
                 }
               }}
             />
-            <button type="button" className="btn-clay" onClick={() => setPicking(true)}>
+            <button type="button" className="btn-brand" onClick={() => setPicking(true)}>
               + New form
             </button>
             {!openDev && (
@@ -75,7 +75,7 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         {openDev && (
-          <p className="mb-6 rounded-xl border border-clay/30 bg-clay-light/30 p-3 text-sm">
+          <p className="mb-6 rounded-xl border border-brand/30 bg-brand-light/30 p-3 text-sm">
             Dev mode: the dashboard is open because <code>CLAYFORM_PASSWORD</code> isn&apos;t set. Set it before you put this online.
           </p>
         )}
@@ -85,7 +85,7 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
           </p>
         )}
         <div className="flex items-end justify-between">
-          <h1 className="font-display text-3xl font-bold">Your forms</h1>
+          <h1 className="font-display text-3xl font-extrabold">Your forms</h1>
           <p className="text-sm text-ink-soft">Unlimited forms · unlimited responses</p>
         </div>
 
@@ -101,7 +101,7 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {templates.map((t) => (
-                <button key={t.id} type="button" onClick={() => create({ template: t.id })} className="rounded-xl border border-ink/10 p-4 text-left transition hover:border-clay hover:bg-clay/5">
+                <button key={t.id} type="button" onClick={() => create({ template: t.id })} className="rounded-xl border border-ink/10 p-4 text-left transition hover:border-brand hover:bg-brand/5">
                   <span className="block font-semibold">{t.name}</span>
                   <span className="mt-1 block text-sm text-ink-soft">{t.blurb}</span>
                 </button>
@@ -121,7 +121,7 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
                 </Link>
                 <div className="flex flex-1 flex-col p-4">
                   <div className="flex items-center gap-2 text-xs">
-                    <span className={`rounded-full px-2 py-0.5 font-semibold ${f.status === "published" ? "bg-emerald-100 text-emerald-800" : "bg-sand text-ink-soft"}`}>
+                    <span className={`rounded-full px-2 py-0.5 font-semibold ${f.status === "published" ? "bg-emerald-100 text-emerald-800" : "bg-mist text-ink-soft"}`}>
                       {f.status === "published" ? "Live" : "Draft"}
                     </span>
                     <span className="text-ink-soft">{f.fields.length} questions</span>
@@ -132,7 +132,7 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
                       ["Done", f.stats.completes],
                       ["Rate", `${rate}%`],
                     ].map(([k, v]) => (
-                      <div key={k} className="rounded-lg bg-sand/50 py-1.5">
+                      <div key={k} className="rounded-lg bg-mist/50 py-1.5">
                         <dd className="font-semibold tabular-nums">{v}</dd>
                         <dt className="text-[11px] text-ink-soft">{k}</dt>
                       </div>
