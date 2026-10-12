@@ -2,6 +2,7 @@ import { authProblem, hashPassword, normalizeEmail, PASSWORD_MIN, signupsOpen, s
 import { json, readJson } from "@/lib/api";
 import { claimOrphanForms, createUser, storageProblem } from "@/lib/db";
 import { uid } from "@/lib/fields";
+import { newUserPlan } from "@/lib/plans";
 import { clientIp, rateLimited } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
   if (password.length > 200) return json({ error: "That password is too long.", field: "password" }, 422);
 
   const now = new Date().toISOString();
-  const user = { id: uid(16), email, name, passwordHash: await hashPassword(password), passwordChangedAt: now, createdAt: now };
+  const user = { id: uid(16), email, name, passwordHash: await hashPassword(password), passwordChangedAt: now, createdAt: now, plan: newUserPlan() };
   if (!(await createUser(user))) return json({ error: "There's already an account with that email. Log in instead.", field: "email" }, 409);
   await claimOrphanForms(user.id);
   await startSession(user);

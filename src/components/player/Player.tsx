@@ -36,6 +36,8 @@ export interface PlayerProps {
   focus?: string;
   resumeParam?: string;
   closedMessage?: string | null;
+  /** Hosted Cloud only: where respondents report abuse. */
+  reportUrl?: string;
   maxUploadMb?: number;
 }
 
@@ -82,7 +84,7 @@ function initialScreen(form: Form, focus: string | undefined, ctx: Ctx, closedMe
   return step.kind === "field" ? { kind: "field", ref: step.ref } : { kind: "ending", id: step.id };
 }
 
-export function Player({ form, preview = false, contained = false, embedded = false, initialHidden = {}, focus, resumeParam, closedMessage, maxUploadMb = 10 }: PlayerProps) {
+export function Player({ form, preview = false, contained = false, embedded = false, initialHidden = {}, focus, resumeParam, closedMessage, maxUploadMb = 10, reportUrl }: PlayerProps) {
   const hidden = useMemo(() => {
     const out: Record<string, string> = {};
     for (const key of form.hiddenFields) if (initialHidden[key]) out[key] = initialHidden[key];
@@ -663,7 +665,7 @@ export function Player({ form, preview = false, contained = false, embedded = fa
       <main className={`mx-auto flex w-full max-w-2xl flex-1 px-6 ${classic && screen.kind === "welcome" ? "items-start" : "items-center"} py-16 sm:px-8`}>
         {body}
       </main>
-      {(showNav || form.settings.branding || (form.settings.allowResume && !preview && screen.kind === "field" && answeredCount > 0) || offline) && (
+      {(showNav || form.settings.branding || !!reportUrl || (form.settings.allowResume && !preview && screen.kind === "field" && answeredCount > 0) || offline) && (
         <footer
           className={`${contained ? "sticky" : "fixed"} bottom-0 left-0 right-0 flex items-center justify-between gap-3 p-3 sm:p-4`}
           style={{ background: classic ? "var(--cf-bg)" : undefined }}
@@ -681,6 +683,11 @@ export function Player({ form, preview = false, contained = false, embedded = fa
               </a>
             )}
             {offline && <span className="opacity-70">Offline — saving on this device</span>}
+            {reportUrl && (
+              <a href={reportUrl} target="_blank" rel="noopener" className="px-1 py-2 opacity-50 underline-offset-2 hover:underline hover:opacity-100">
+                Report
+              </a>
+            )}
             {form.settings.allowResume && !preview && answeredCount > 0 && screen.kind === "field" && (
               <button type="button" onClick={copyResumeLink} className="px-1 py-2 underline-offset-2 opacity-70 hover:underline hover:opacity-100">
                 {copied ? "Link copied ✓" : "Finish later"}

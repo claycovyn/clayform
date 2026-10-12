@@ -1,5 +1,6 @@
 import { json } from "@/lib/api";
-import { getFormBySlug, saveFile } from "@/lib/db";
+import { formOwner, getFormBySlug, saveFile } from "@/lib/db";
+import { meter } from "@/lib/plans";
 import { uid } from "@/lib/fields";
 import { maxUploadMb } from "@/lib/limits";
 import { clientIp, rateLimited } from "@/lib/rateLimit";
@@ -28,5 +29,6 @@ export async function POST(req: Request, { params }: Params) {
   const name = file.name.replace(/[\\/\u0000-\u001f]/g, "_").slice(0, 200) || "upload";
   const type = (file.type || "application/octet-stream").slice(0, 100);
   await saveFile({ id, formId: form.id, name, type, size: file.size }, Buffer.from(await file.arrayBuffer()));
+  await meter(await formOwner(form.id), "uploads_bytes", file.size);
   return json({ fileId: id, name, size: file.size, type });
 }

@@ -1,6 +1,8 @@
 import { json, missingScope, readJson, requireOwnedForm } from "@/lib/api";
 import { deleteForm, saveForm, slugTaken } from "@/lib/db";
 import { parseForm } from "@/lib/schema";
+import { publishRefusal } from "@/lib/abuse";
+import { cloudEnabled } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> };
@@ -23,6 +25,8 @@ export async function PUT(req: Request, { params }: Params) {
   if (forbidden) return forbidden;
   const form = { ...parsed.form, id: current.id, createdAt: current.createdAt, updatedAt: new Date().toISOString() };
   if (await slugTaken(form.slug, current.id)) return json({ error: "That link is already used by another form." }, 409);
+  const refusal = cloudEnabled() && form.status === "published" ? publishRefusal(form) : null;
+  if (refusal) return json({ error: refusal }, 422);
   await saveForm(form, user.id);
   return json({ form });
 }

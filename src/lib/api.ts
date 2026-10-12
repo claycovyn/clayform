@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ALL_SCOPES, bearerToken, verifyApiKey, type Scope } from "./apiKeys";
 import { currentUser } from "./auth";
 import { getOwnedForm, type User } from "./db";
+import { meter } from "./plans";
 import { rateLimited } from "./rateLimit";
 import type { Form } from "./types";
 
@@ -34,6 +35,7 @@ export async function authenticate(req?: Request): Promise<{ caller: Caller; den
     if (!found) return { caller: null, denied: json({ error: "Invalid or revoked API key." }, 401, { "www-authenticate": 'Bearer realm="clayform"' }) };
     if (rateLimited(`key:${found.key.id}`, KEY_RATE_LIMIT))
       return { caller: null, denied: json({ error: "Too many requests for this API key. Try again in a minute." }, 429, { "retry-after": "60" }) };
+    await meter(found.user.id, "api_requests");
     return { caller: { user: found.user, via: "key", scopes: found.key.scopes.filter((s): s is Scope => ALL_SCOPES.includes(s as Scope)), keyId: found.key.id }, denied: null };
   }
   const user = await currentUser();

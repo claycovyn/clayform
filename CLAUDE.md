@@ -28,6 +28,15 @@ user's `passwordChangedAt`). Every form has an `owner_id`; admin routes go throu
 - `openctrl.json` (repo root, served at `/openctrl.json`) is the OPENCTRL manifest. `tests/mcp.test.ts` fails if its
   tools or scopes drift from the code.
 
+## Cloud (plans, metering, abuse) — build plan 7.1
+- `src/lib/plans.ts`: plans (Free Cloud 100 completed responses/month, Pro $9, `grandfathered` = no caps), metering
+  (`meter()` into `usage_daily`; never throws), `limitStatus`, `newResponsesPaused`. **Limits only when
+  `CLAYFORM_CLOUD=1`**; self-hosted installs are never limited. Accounts created before Cloud was on are grandfathered.
+- At the limit only *new* respondents are turned away (`submit.ts`, `/f/[slug]`); export always works.
+- `src/lib/abuse.ts` (credential-harvest refusal on publish, impersonation flags, report reasons), `/report/[slug]`,
+  takedowns (`takedowns` table, checked in `closedReason`). `src/lib/costs.ts` + `src/lib/workspaces.ts` + `/admin`
+  (`CLAYFORM_ADMIN_EMAILS`). Operator guide: `docs/CLOUD.md`. Tests: `tests/cloud.test.ts`.
+
 ## Hosting
 - GitHub: https://github.com/claycovyn/clayform (public, default branch `main`).
 - Vercel is on a **Hobby** team owned by `claycovyn`. Hobby only deploys a commit when every author and

@@ -26,6 +26,9 @@ Free forever. You need a server that can run Node.js, or Docker, or a Vercel acc
 | `CLAYFORM_ALLOW_PRIVATE_WEBHOOKS` | off | `1` allows webhooks to private network addresses |
 | `CLAYFORM_SOURCE_URL` | the official repo | Your fork's address, if you've changed Clayform (see below) |
 
+`CLAYFORM_CLOUD`, `CLAYFORM_ADMIN_EMAILS` and `CLAYFORM_SUPPORT_EMAIL` are for the hosted service
+([docs/CLOUD.md](CLOUD.md)). Leave them unset: a self-hosted Clayform has no plans and no limits.
+
 ## Install
 
 - **Node**: `npm ci && npm run build && npm start`

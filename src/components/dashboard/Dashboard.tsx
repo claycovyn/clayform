@@ -7,14 +7,54 @@ import type { Form, FormStats } from "@/lib/types";
 
 type Listed = Form & { stats: FormStats };
 
+/** Cloud plan usage, when this install enforces limits. */
+export interface PlanUsage {
+  planName: string;
+  used: number;
+  limit: number | null;
+  paused: boolean;
+  resetsAt: string;
+}
+
+function UsageBanner({ usage }: { usage: PlanUsage }) {
+  if (usage.limit === null) return null;
+  const pct = Math.min(100, Math.round((usage.used / usage.limit) * 100));
+  const resets = new Date(usage.resetsAt).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  return (
+    <section aria-label="Plan usage" className={`card mb-6 p-4 ${usage.paused ? "border-red-300 bg-red-50" : ""}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <p>
+          <span className="font-semibold">{usage.planName}</span> · {usage.used} of {usage.limit} responses this month
+        </p>
+        <p className="text-ink-soft">Resets {resets} · Export anytime</p>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-mist" role="progressbar" aria-valuenow={usage.used} aria-valuemin={0} aria-valuemax={usage.limit} aria-label="Responses used this month">
+        <div className={`h-full rounded-full ${usage.paused ? "bg-red-600" : pct >= 80 ? "bg-amber-500" : "bg-brand"}`} style={{ width: `${pct}%` }} />
+      </div>
+      {usage.paused && (
+        <p className="mt-2 text-sm text-red-700">
+          You&apos;ve reached this month&apos;s limit, so your forms aren&apos;t taking <b>new</b> responses until {resets}. People already answering can finish, and nothing is deleted. Self-hosting Clayform has no limits.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function Dashboard({
   forms: initial,
   templates,
   user,
+  usage,
+  removed = {},
+  supportEmail,
 }: {
   forms: Listed[];
   templates: { id: string; name: string; blurb: string }[];
   user: { name: string; email: string };
+  usage?: PlanUsage | null;
+  /** Forms an admin took down, with the reason. */
+  removed?: Record<string, string>;
+  supportEmail?: string;
 }) {
   const [forms, setForms] = useState(initial);
   const [picking, setPicking] = useState(initial.length === 0);
@@ -83,6 +123,7 @@ export function Dashboard({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8">
+        {usage && <UsageBanner usage={usage} />}
         {error && (
           <p className="mb-6 rounded-xl bg-red-50 p-3 text-sm text-red-700" role="alert">
             {error}
@@ -90,7 +131,7 @@ export function Dashboard({
         )}
         <div className="flex flex-wrap items-end justify-between gap-2">
           <h1 className="font-display text-3xl font-extrabold">Your forms</h1>
-          <p className="text-sm text-ink-soft">Unlimited forms · unlimited responses</p>
+          <p className="text-sm text-ink-soft">{usage?.limit != null ? "Unlimited forms" : "Unlimited forms · unlimited responses"}</p>
         </div>
 
         {picking && (
@@ -125,11 +166,16 @@ export function Dashboard({
                 </Link>
                 <div className="flex flex-1 flex-col p-4">
                   <div className="flex items-center gap-2 text-xs">
-                    <span className={`rounded-full px-2 py-0.5 font-semibold ${f.status === "published" ? "bg-emerald-100 text-emerald-800" : "bg-mist text-ink-soft"}`}>
-                      {f.status === "published" ? "Live" : "Draft"}
-                    </span>
+                    {removed[f.id] ? (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-700" title={removed[f.id]}>Removed</span>
+                    ) : (
+                      <span className={`rounded-full px-2 py-0.5 font-semibold ${f.status === "published" ? "bg-emerald-100 text-emerald-800" : "bg-mist text-ink-soft"}`}>
+                        {f.status === "published" ? "Live" : "Draft"}
+                      </span>
+                    )}
                     <span className="text-ink-soft">{f.fields.length} questions</span>
                   </div>
+                  {removed[f.id] && <p className="mt-2 text-xs text-red-700">Removed by Clayform: {removed[f.id]} Its link shows a removal notice.{supportEmail && <> Think it&apos;s a mistake? Write to <a className="underline" href={`mailto:${supportEmail}`}>{supportEmail}</a>.</>}</p>}
                   <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
                     {[
                       ["Views", f.stats.views],

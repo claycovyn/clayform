@@ -2,7 +2,9 @@
 import "server-only";
 import crypto from "node:crypto";
 import { computeScore, fieldByRef, isEmpty, isQuestion, resolvePath, validateAnswer } from "./engine";
-import { formStats, getFile, getResponse, saveResponse } from "./db";
+import { formOwner, formStats, getFile, getResponse, getTakedown, saveResponse } from "./db";
+import { meter, newResponsesPaused, PAUSED_MESSAGE } from "./plans";
+import { rateLimited } from "./rateLimit";
 import { hash } from "./auth";
 import { uid } from "./fields";
 import { webhookBlocked } from "./netguard";
@@ -22,7 +24,10 @@ export interface SubmitBody {
 
 export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string; ref?: string };
 
+export const TAKEN_DOWN_MESSAGE = "This form was removed for breaking Clayform's rules.";
+
 export async function closedReason(form: Form): Promise<string | null> {
+  if (await getTakedown(form.id)) return TAKEN_DOWN_MESSAGE;
   if (form.status !== "published" || form.settings.closed) return form.settings.closedMessage;
   if (form.settings.closeAt && Date.parse(form.settings.closeAt) < Date.now()) return form.settings.closedMessage;
   if (form.settings.responseLimit && await (await formStats(form.id)).completes >= form.settings.responseLimit)
@@ -79,6 +84,13 @@ export async function submit(
       return { ok: true, data: { responseId: existing.id, endingId: existing.endingId, score: existing.score } };
   }
 
+  const ownerId = await formOwner(form.id);
+  if (!existing) {
+    // A brand-new respondent: respect the workspace's plan limit and a per-workspace flood guard.
+    if (await newResponsesPaused(ownerId)) return { ok: false, status: 403, error: PAUSED_MESSAGE };
+    if (ownerId && rateLimited(`workspace:${ownerId}`, 300)) return { ok: false, status: 429, error: "This form is very busy. Try again in a minute." };
+  }
+
   const answers: Answers = { ...(existing?.answers ?? {}), ...(await coerce(form, body.answers ?? {})) };
   // Answers the respondent cleared on the way back are removed.
   for (const [ref, value] of Object.entries(body.answers ?? {})) if (value === null) delete answers[ref];
@@ -131,6 +143,8 @@ export async function submit(
     resumeHash = hash(resumeToken);
   }
   await saveResponse(response, resumeHash);
+  if (!existing) await meter(ownerId, "responses_started");
+  if (completedAt) await meter(ownerId, "responses_completed");
 
   if (completedAt) await deliverWebhook(form, response);
   return { ok: true, data: { responseId: response.id, resumeToken, endingId, score: response.score } };

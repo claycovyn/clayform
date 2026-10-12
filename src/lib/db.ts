@@ -18,6 +18,36 @@ export interface User {
   /** Changing the password signs out every other session. */
   passwordChangedAt: string;
   createdAt: string;
+  /** Cloud plan: "free" | "pro" | "grandfathered". Only enforced when CLAYFORM_CLOUD=1 (see lib/plans.ts). */
+  plan?: string;
+}
+
+/** One metered quantity for one workspace on one UTC day. */
+export interface UsageRow {
+  userId: string;
+  day: string;
+  metric: string;
+  amount: number;
+}
+
+export interface AbuseReport {
+  id: string;
+  formId: string;
+  reason: string;
+  details: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolution: string | null;
+}
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  name: string;
+  plan: string;
+  createdAt: string;
+  forms: number;
+  storageBytes: number;
 }
 
 /** An API key for agents and scripts. Only the SHA-256 of the secret is stored. */
@@ -89,6 +119,22 @@ interface Store {
   /** Returns false when the key doesn't exist, isn't this user's, or is already revoked. */
   revokeApiKey(userId: string, id: string): Promise<boolean>;
   touchApiKey(id: string, at: string): Promise<void>;
+  setUserPlan(id: string, plan: string): Promise<void>;
+  /** Adds to a workspace's counter for that UTC day. */
+  addUsage(userId: string, metric: string, amount: number, day: string): Promise<void>;
+  /** Usage rows between two UTC days (inclusive); one user, or everyone. */
+  usage(fromDay: string, toDay: string, userId?: string): Promise<UsageRow[]>;
+  /** Every workspace with its form count and stored bytes (form and response documents plus uploads). */
+  adminUsers(): Promise<AdminUserRow[]>;
+  createReport(r: AbuseReport): Promise<void>;
+  listReports(openOnly: boolean): Promise<AbuseReport[]>;
+  resolveReport(id: string, resolution: string): Promise<void>;
+  setTakedown(formId: string, reason: string | null): Promise<void>;
+  getTakedown(formId: string): Promise<{ reason: string; createdAt: string } | null>;
+  getSetting(key: string): Promise<string | null>;
+  setSetting(key: string, value: string): Promise<void>;
+  /** Published forms with their owner, for abuse scans. */
+  publishedForms(): Promise<{ form: Form; ownerId: string | null }[]>;
 }
 
 export const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
@@ -115,6 +161,16 @@ const toUser = (r: Row): User => ({
   passwordHash: String(r.password_hash),
   passwordChangedAt: iso(r.password_changed_at),
   createdAt: iso(r.created_at),
+  plan: r.plan ? String(r.plan) : "grandfathered",
+});
+const toReport = (r: Row): AbuseReport => ({
+  id: String(r.id),
+  formId: String(r.form_id),
+  reason: String(r.reason),
+  details: String(r.details),
+  createdAt: iso(r.created_at),
+  resolvedAt: r.resolved_at ? iso(r.resolved_at) : null,
+  resolution: r.resolution ? String(r.resolution) : null,
 });
 const toFile = (r: Row): StoredFile => ({
   id: String(r.id),
@@ -196,7 +252,23 @@ function sqliteStore(): Store {
         created_at TEXT NOT NULL, last_used_at TEXT, revoked_at TEXT
       );
       CREATE INDEX IF NOT EXISTS api_keys_user ON api_keys(user_id, created_at);
+      CREATE TABLE IF NOT EXISTS usage_daily (
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, day TEXT NOT NULL, metric TEXT NOT NULL,
+        amount INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (user_id, day, metric)
+      );
+      CREATE INDEX IF NOT EXISTS usage_daily_day ON usage_daily(day);
+      CREATE TABLE IF NOT EXISTS reports (
+        id TEXT PRIMARY KEY, form_id TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE, reason TEXT NOT NULL,
+        details TEXT NOT NULL, created_at TEXT NOT NULL, resolved_at TEXT, resolution TEXT
+      );
+      CREATE TABLE IF NOT EXISTS takedowns (
+        form_id TEXT PRIMARY KEY REFERENCES forms(id) ON DELETE CASCADE, reason TEXT NOT NULL, created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
+    // Accounts that existed before Cloud plans keep no limits ("grandfathered"); new ones get a plan at sign-up.
+    const userCols = handle.prepare("PRAGMA table_info(users)").all() as Row[];
+    if (!userCols.some((c) => c.name === "plan")) handle.exec("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'grandfathered'");
     // Installs from before accounts existed: add the owner column.
     const cols = handle.prepare("PRAGMA table_info(forms)").all() as Row[];
     if (!cols.some((c) => c.name === "owner_id")) {
@@ -218,8 +290,8 @@ function sqliteStore(): Store {
     async createUser(u) {
       try {
         db()
-          .prepare("INSERT INTO users (id, email, name, password_hash, password_changed_at, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-          .run(u.id, u.email, u.name, u.passwordHash, u.passwordChangedAt, u.createdAt);
+          .prepare("INSERT INTO users (id, email, name, password_hash, password_changed_at, created_at, plan) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .run(u.id, u.email, u.name, u.passwordHash, u.passwordChangedAt, u.createdAt, u.plan ?? "grandfathered");
         return true;
       } catch (e) {
         if (String((e as Error).message).includes("UNIQUE")) return false;
@@ -361,6 +433,62 @@ function sqliteStore(): Store {
     async touchApiKey(id, at) {
       db().prepare("UPDATE api_keys SET last_used_at = ? WHERE id = ?").run(at, id);
     },
+    async setUserPlan(id, plan) {
+      db().prepare("UPDATE users SET plan = ? WHERE id = ?").run(plan, id);
+    },
+    async addUsage(userId, metric, amount, day) {
+      db()
+        .prepare("INSERT INTO usage_daily (user_id, day, metric, amount) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, day, metric) DO UPDATE SET amount = amount + excluded.amount")
+        .run(userId, day, metric, amount);
+    },
+    async usage(fromDay, toDay, userId) {
+      const rows = (userId
+        ? db().prepare("SELECT * FROM usage_daily WHERE day >= ? AND day <= ? AND user_id = ?").all(fromDay, toDay, userId)
+        : db().prepare("SELECT * FROM usage_daily WHERE day >= ? AND day <= ?").all(fromDay, toDay)) as Row[];
+      return rows.map((r) => ({ userId: String(r.user_id), day: String(r.day), metric: String(r.metric), amount: Number(r.amount) }));
+    },
+    async adminUsers() {
+      const rows = db()
+        .prepare(
+          `SELECT u.id, u.email, u.name, u.plan, u.created_at,
+            (SELECT COUNT(*) FROM forms f WHERE f.owner_id = u.id) AS forms,
+            COALESCE((SELECT SUM(LENGTH(f.doc)) FROM forms f WHERE f.owner_id = u.id), 0)
+            + COALESCE((SELECT SUM(LENGTH(r.doc)) FROM responses r JOIN forms f ON f.id = r.form_id WHERE f.owner_id = u.id), 0)
+            + COALESCE((SELECT SUM(x.size) FROM files x JOIN forms f ON f.id = x.form_id WHERE f.owner_id = u.id), 0) AS bytes
+          FROM users u ORDER BY u.created_at`,
+        )
+        .all() as Row[];
+      return rows.map((r) => ({ id: String(r.id), email: String(r.email), name: String(r.name), plan: String(r.plan), createdAt: iso(r.created_at), forms: Number(r.forms), storageBytes: Number(r.bytes) }));
+    },
+    async createReport(r) {
+      db().prepare("INSERT INTO reports (id, form_id, reason, details, created_at) VALUES (?, ?, ?, ?, ?)").run(r.id, r.formId, r.reason, r.details, r.createdAt);
+    },
+    async listReports(openOnly) {
+      const rows = db().prepare(`SELECT * FROM reports ${openOnly ? "WHERE resolved_at IS NULL" : ""} ORDER BY created_at DESC LIMIT 500`).all() as Row[];
+      return rows.map(toReport);
+    },
+    async resolveReport(id, resolution) {
+      db().prepare("UPDATE reports SET resolved_at = ?, resolution = ? WHERE id = ?").run(new Date().toISOString(), resolution, id);
+    },
+    async setTakedown(formId, reason) {
+      if (reason === null) db().prepare("DELETE FROM takedowns WHERE form_id = ?").run(formId);
+      else db().prepare("INSERT INTO takedowns (form_id, reason, created_at) VALUES (?, ?, ?) ON CONFLICT(form_id) DO UPDATE SET reason = excluded.reason").run(formId, reason, new Date().toISOString());
+    },
+    async getTakedown(formId) {
+      const r = db().prepare("SELECT reason, created_at FROM takedowns WHERE form_id = ?").get(formId) as Row | undefined;
+      return r ? { reason: String(r.reason), createdAt: iso(r.created_at) } : null;
+    },
+    async getSetting(key) {
+      const r = db().prepare("SELECT value FROM settings WHERE key = ?").get(key) as Row | undefined;
+      return r ? String(r.value) : null;
+    },
+    async setSetting(key, value) {
+      db().prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+    },
+    async publishedForms() {
+      const rows = db().prepare("SELECT doc, owner_id FROM forms WHERE json_extract(doc, '$.status') = 'published' ORDER BY updated_at DESC LIMIT 2000").all() as Row[];
+      return rows.map((r) => ({ form: doc<Form>(r.doc), ownerId: r.owner_id ? String(r.owner_id) : null }));
+    },
   };
 }
 
@@ -376,8 +504,13 @@ function postgresStore(url: string): Store {
       // prepare:false keeps it compatible with poolers (Neon, Supabase, PgBouncer).
       client = postgres(url, { max: 3, prepare: false, idle_timeout: 20, onnotice: () => {} });
     }
-    ready ??= client
-      .unsafe(
+    const c = client;
+    // An advisory lock serialises schema setup, so instances starting at the same time on a fresh database don't
+    // race each other's CREATE TABLE IF NOT EXISTS.
+    ready ??= c
+      .begin(async (tx) => {
+        await tx`SELECT pg_advisory_xact_lock(483921)`;
+        await tx.unsafe(
         `CREATE TABLE IF NOT EXISTS clayform_users (
           id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password_hash TEXT NOT NULL,
           password_changed_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL
@@ -403,8 +536,24 @@ function postgresStore(url: string): Store {
           name TEXT NOT NULL, prefix TEXT NOT NULL, hash TEXT NOT NULL UNIQUE, scopes JSONB NOT NULL,
           created_at TIMESTAMPTZ NOT NULL, last_used_at TIMESTAMPTZ, revoked_at TIMESTAMPTZ
         );
-        CREATE INDEX IF NOT EXISTS clayform_api_keys_user ON clayform_api_keys(user_id, created_at);`,
-      )
+        CREATE INDEX IF NOT EXISTS clayform_api_keys_user ON clayform_api_keys(user_id, created_at);
+        ALTER TABLE clayform_users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'grandfathered';
+        CREATE TABLE IF NOT EXISTS clayform_usage_daily (
+          user_id TEXT NOT NULL REFERENCES clayform_users(id) ON DELETE CASCADE, day TEXT NOT NULL, metric TEXT NOT NULL,
+          amount BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (user_id, day, metric)
+        );
+        CREATE INDEX IF NOT EXISTS clayform_usage_daily_day ON clayform_usage_daily(day);
+        CREATE TABLE IF NOT EXISTS clayform_reports (
+          id TEXT PRIMARY KEY, form_id TEXT NOT NULL REFERENCES clayform_forms(id) ON DELETE CASCADE, reason TEXT NOT NULL,
+          details TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL, resolved_at TIMESTAMPTZ, resolution TEXT
+        );
+        CREATE TABLE IF NOT EXISTS clayform_takedowns (
+          form_id TEXT PRIMARY KEY REFERENCES clayform_forms(id) ON DELETE CASCADE, reason TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE TABLE IF NOT EXISTS clayform_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
+        );
+      })
       .then(() => undefined)
       .catch((e) => {
         ready = null;
@@ -422,8 +571,8 @@ function postgresStore(url: string): Store {
   return {
     async createUser(u) {
       const q = await sql();
-      const rows = await q`INSERT INTO clayform_users (id, email, name, password_hash, password_changed_at, created_at)
-        VALUES (${u.id}, ${u.email}, ${u.name}, ${u.passwordHash}, ${u.passwordChangedAt}, ${u.createdAt})
+      const rows = await q`INSERT INTO clayform_users (id, email, name, password_hash, password_changed_at, created_at, plan)
+        VALUES (${u.id}, ${u.email}, ${u.name}, ${u.passwordHash}, ${u.passwordChangedAt}, ${u.createdAt}, ${u.plan ?? "grandfathered"})
         ON CONFLICT (email) DO NOTHING RETURNING id`;
       return rows.length === 1;
     },
@@ -569,6 +718,67 @@ function postgresStore(url: string): Store {
       const q = await sql();
       await q`UPDATE clayform_api_keys SET last_used_at = ${at} WHERE id = ${id}`;
     },
+    async setUserPlan(id, plan) {
+      const q = await sql();
+      await q`UPDATE clayform_users SET plan = ${plan} WHERE id = ${id}`;
+    },
+    async addUsage(userId, metric, amount, day) {
+      const q = await sql();
+      await q`INSERT INTO clayform_usage_daily (user_id, day, metric, amount) VALUES (${userId}, ${day}, ${metric}, ${amount})
+        ON CONFLICT (user_id, day, metric) DO UPDATE SET amount = clayform_usage_daily.amount + EXCLUDED.amount`;
+    },
+    async usage(fromDay, toDay, userId) {
+      const q = await sql();
+      const rows = await q`SELECT * FROM clayform_usage_daily WHERE day >= ${fromDay} AND day <= ${toDay} ${userId ? q`AND user_id = ${userId}` : q``}`;
+      return rows.map((r) => ({ userId: String(r.user_id), day: String(r.day), metric: String(r.metric), amount: Number(r.amount) }));
+    },
+    async adminUsers() {
+      const q = await sql();
+      const rows = await q`SELECT u.id, u.email, u.name, u.plan, u.created_at,
+          (SELECT COUNT(*) FROM clayform_forms f WHERE f.owner_id = u.id) AS forms,
+          COALESCE((SELECT SUM(octet_length(f.doc::text)) FROM clayform_forms f WHERE f.owner_id = u.id), 0)
+          + COALESCE((SELECT SUM(octet_length(r.doc::text)) FROM clayform_responses r JOIN clayform_forms f ON f.id = r.form_id WHERE f.owner_id = u.id), 0)
+          + COALESCE((SELECT SUM(x.size) FROM clayform_files x JOIN clayform_forms f ON f.id = x.form_id WHERE f.owner_id = u.id), 0) AS bytes
+        FROM clayform_users u ORDER BY u.created_at`;
+      return rows.map((r) => ({ id: String(r.id), email: String(r.email), name: String(r.name), plan: String(r.plan), createdAt: iso(r.created_at), forms: Number(r.forms), storageBytes: Number(r.bytes) }));
+    },
+    async createReport(r) {
+      const q = await sql();
+      await q`INSERT INTO clayform_reports (id, form_id, reason, details, created_at) VALUES (${r.id}, ${r.formId}, ${r.reason}, ${r.details}, ${r.createdAt})`;
+    },
+    async listReports(openOnly) {
+      const q = await sql();
+      const rows = await q`SELECT * FROM clayform_reports ${openOnly ? q`WHERE resolved_at IS NULL` : q``} ORDER BY created_at DESC LIMIT 500`;
+      return rows.map(toReport);
+    },
+    async resolveReport(id, resolution) {
+      const q = await sql();
+      await q`UPDATE clayform_reports SET resolved_at = now(), resolution = ${resolution} WHERE id = ${id}`;
+    },
+    async setTakedown(formId, reason) {
+      const q = await sql();
+      if (reason === null) await q`DELETE FROM clayform_takedowns WHERE form_id = ${formId}`;
+      else await q`INSERT INTO clayform_takedowns (form_id, reason) VALUES (${formId}, ${reason}) ON CONFLICT (form_id) DO UPDATE SET reason = EXCLUDED.reason`;
+    },
+    async getTakedown(formId) {
+      const q = await sql();
+      const [r] = await q`SELECT reason, created_at FROM clayform_takedowns WHERE form_id = ${formId}`;
+      return r ? { reason: String(r.reason), createdAt: iso(r.created_at) } : null;
+    },
+    async getSetting(key) {
+      const q = await sql();
+      const [r] = await q`SELECT value FROM clayform_settings WHERE key = ${key}`;
+      return r ? String(r.value) : null;
+    },
+    async setSetting(key, value) {
+      const q = await sql();
+      await q`INSERT INTO clayform_settings (key, value) VALUES (${key}, ${value}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
+    },
+    async publishedForms() {
+      const q = await sql();
+      const rows = await q`SELECT doc, owner_id FROM clayform_forms WHERE doc->>'status' = 'published' ORDER BY updated_at DESC LIMIT 2000`;
+      return rows.map((r) => ({ form: doc<Form>(r.doc), ownerId: r.owner_id ? String(r.owner_id) : null }));
+    },
   };
 }
 
@@ -613,3 +823,15 @@ export const listApiKeys = (userId: string) => s().listApiKeys(userId);
 export const getApiKeyByHash = (hash: string) => s().getApiKeyByHash(hash);
 export const revokeApiKey = (userId: string, id: string) => s().revokeApiKey(userId, id);
 export const touchApiKey = (id: string, at: string) => s().touchApiKey(id, at);
+export const setUserPlan = (id: string, plan: string) => s().setUserPlan(id, plan);
+export const addUsage = (userId: string, metric: string, amount: number, day: string) => s().addUsage(userId, metric, amount, day);
+export const usageRows = (fromDay: string, toDay: string, userId?: string) => s().usage(fromDay, toDay, userId);
+export const adminUsers = () => s().adminUsers();
+export const createReport = (r: AbuseReport) => s().createReport(r);
+export const listReports = (openOnly = true) => s().listReports(openOnly);
+export const resolveReport = (id: string, resolution: string) => s().resolveReport(id, resolution);
+export const setTakedown = (formId: string, reason: string | null) => s().setTakedown(formId, reason);
+export const getTakedown = (formId: string) => s().getTakedown(formId);
+export const getSetting = (key: string) => s().getSetting(key);
+export const setSetting = (key: string, value: string) => s().setSetting(key, value);
+export const publishedForms = () => s().publishedForms();
