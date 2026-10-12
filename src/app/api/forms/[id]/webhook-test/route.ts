@@ -9,7 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(_: Request, { params }: Params) {
   const denied = await requireAdmin();
   if (denied) return denied;
-  const form = getForm((await params).id);
+  const form = await getForm((await params).id);
   if (!form) return json({ error: "Not found." }, 404);
   if (!form.settings.webhookUrl) return json({ error: "Save a webhook URL first." }, 400);
   const now = new Date().toISOString();

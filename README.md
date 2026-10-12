@@ -79,15 +79,28 @@ CLAYFORM_PASSWORD=choose-something-long docker compose up -d
 
 Data (the SQLite database and uploaded files) lives in the `clayform-data` volume. Back it up by copying `/data`.
 
+### Deploy on Vercel
+
+Vercel's servers have no permanent disk, so on Vercel Clayform stores everything in Postgres. A free Neon or Supabase database is enough.
+
+1. On [vercel.com/new](https://vercel.com/new), import this repository (or your fork).
+2. Under **Environment Variables**, add `CLAYFORM_PASSWORD` (your dashboard password) and `CLAYFORM_SECRET` (any long random string). Click **Deploy**.
+3. In the new project, open **Storage → Create Database**, pick **Neon** (Postgres, free tier), and connect it to the project. This adds `DATABASE_URL` for you.
+4. Open **Deployments**, click the **⋯** menu on the latest deployment, and choose **Redeploy**. Clayform creates its tables on first use.
+5. Optional: set `NEXT_PUBLIC_SITE_URL` to your domain so share links and embed code use it.
+
+On Vercel, file uploads are capped at 4 MB (Vercel's request-size limit). Files are stored in the database.
+
 ## Configuration
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `CLAYFORM_PASSWORD` | — | Dashboard password. **Required in production**; without it the dashboard stays locked. |
 | `CLAYFORM_SECRET` | password | Signs the session cookie. Use `openssl rand -hex 32`. |
-| `CLAYFORM_DATA_DIR` | `./data` | Where `clayform.db` and `uploads/` live. |
+| `DATABASE_URL` | — | Postgres connection string. When set (also read from `POSTGRES_URL`), Clayform uses Postgres instead of SQLite. Required on Vercel. |
+| `CLAYFORM_DATA_DIR` | `./data` | Where `clayform.db` and `uploads/` live (SQLite only). |
 | `NEXT_PUBLIC_SITE_URL` | request origin | Public URL used in share links and embed code. |
-| `CLAYFORM_MAX_UPLOAD_MB` | `10` | Max size for file-upload answers. |
+| `CLAYFORM_MAX_UPLOAD_MB` | `10` (`4` on Vercel) | Max size for file-upload answers. |
 
 ## Embedding
 
@@ -135,7 +148,7 @@ Download any form as JSON from **Share → Download form JSON**, and import it w
 
 - **Next.js 15** (App Router) + **React 19** + **Tailwind CSS**, TypeScript throughout.
 - **One engine, two sides**: [`src/lib/engine.ts`](src/lib/engine.ts) holds logic, scoring, recall and validation as pure functions. The player runs it in the browser; the API runs it again on the server, so a tampered request can't skip a required question, pick an option that doesn't exist or land on the wrong ending.
-- **Storage**: `node:sqlite` with WAL mode; forms and responses stored as JSON documents.
+- **Storage**: SQLite (`node:sqlite`, WAL mode) when self-hosting, Postgres when `DATABASE_URL` is set. Both sit behind one interface in [`src/lib/db.ts`](src/lib/db.ts); forms and responses are stored as JSON documents.
 - **No tracking, no external services.** Fonts load from Google Fonts; remove the `<link>` in `src/app/layout.tsx` to self-host them.
 
 ```
@@ -161,7 +174,7 @@ npm run build
 
 ## Roadmap
 
-Ideas we'd love help with: multiple users and workspaces, email notifications, Postgres adapter, payment questions (Stripe), signature and address questions, translations, A/B testing of question wording, a visual logic map, Google Sheets sync.
+Ideas we'd love help with: multiple users and workspaces, email notifications, payment questions (Stripe), signature and address questions, translations, A/B testing of question wording, a visual logic map, Google Sheets sync.
 
 ## Contributing
 

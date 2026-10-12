@@ -8,7 +8,7 @@ export const metadata = { title: "Results" };
 
 export default async function ResultsPage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) redirect("/login");
-  const form = getForm((await params).id);
+  const form = await getForm((await params).id);
   if (!form) notFound();
-  return <Results form={form} initial={listResponses(form.id)} stats={formStats(form.id)} />;
+  return <Results form={form} initial={await listResponses(form.id)} stats={await formStats(form.id)} />;
 }

@@ -36,6 +36,7 @@ export interface PlayerProps {
   focus?: string;
   resumeParam?: string;
   closedMessage?: string | null;
+  maxUploadMb?: number;
 }
 
 interface Creds {
@@ -81,7 +82,7 @@ function initialScreen(form: Form, focus: string | undefined, ctx: Ctx, closedMe
   return step.kind === "field" ? { kind: "field", ref: step.ref } : { kind: "ending", id: step.id };
 }
 
-export function Player({ form, preview = false, contained = false, embedded = false, initialHidden = {}, focus, resumeParam, closedMessage }: PlayerProps) {
+export function Player({ form, preview = false, contained = false, embedded = false, initialHidden = {}, focus, resumeParam, closedMessage, maxUploadMb = 10 }: PlayerProps) {
   const hidden = useMemo(() => {
     const out: Record<string, string> = {};
     for (const key of form.hiddenFields) if (initialHidden[key]) out[key] = initialHidden[key];
@@ -478,6 +479,7 @@ export function Player({ form, preview = false, contained = false, embedded = fa
             autoAdvance={conversational}
             slug={form.slug}
             preview={preview}
+            maxUploadMb={maxUploadMb}
             seed={creds.current?.id ?? form.id}
           />
         </div>

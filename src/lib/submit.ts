@@ -21,15 +21,15 @@ export interface SubmitBody {
 
 export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string; ref?: string };
 
-export function closedReason(form: Form): string | null {
+export async function closedReason(form: Form): Promise<string | null> {
   if (form.status !== "published" || form.settings.closed) return form.settings.closedMessage;
   if (form.settings.closeAt && Date.parse(form.settings.closeAt) < Date.now()) return form.settings.closedMessage;
-  if (form.settings.responseLimit && formStats(form.id).completes >= form.settings.responseLimit)
+  if (form.settings.responseLimit && await (await formStats(form.id)).completes >= form.settings.responseLimit)
     return form.settings.closedMessage;
   return null;
 }
 
-function coerce(form: Form, raw: Record<string, unknown>): Answers {
+async function coerce(form: Form, raw: Record<string, unknown>): Promise<Answers> {
   const out: Answers = {};
   for (const [ref, value] of Object.entries(raw)) {
     const field = fieldByRef(form, ref);
@@ -39,7 +39,7 @@ function coerce(form: Form, raw: Record<string, unknown>): Answers {
     else if (typeof value === "number" || typeof value === "boolean") v = value;
     else if (Array.isArray(value)) v = value.filter((x): x is string => typeof x === "string").slice(0, 200).map((x) => x.slice(0, 500));
     else if (value && typeof value === "object" && field.type === "file_upload") {
-      const file = getFile(String((value as { fileId?: unknown }).fileId ?? ""));
+      const file = await getFile(String((value as { fileId?: unknown }).fileId ?? ""));
       if (file && file.formId === form.id) v = { fileId: file.id, name: file.name, size: file.size, type: file.type };
     }
     if (field.type === "email" && typeof v === "string") v = v.trim();
@@ -63,14 +63,14 @@ export async function submit(
   body: SubmitBody,
   meta: { userAgent?: string; referrer?: string },
 ): Promise<Result<{ responseId: string; resumeToken?: string; endingId?: string; score: number }>> {
-  const closed = closedReason(form);
+  const closed = await closedReason(form);
   if (closed) return { ok: false, status: 403, error: closed };
 
   if (body.website) return { ok: true, data: { responseId: uid(), score: 0 } };
 
   let existing: ResponseRecord | null = null;
   if (body.responseId) {
-    const found = getResponse(body.responseId);
+    const found = await getResponse(body.responseId);
     if (!found || found.response.formId !== form.id || !body.resumeToken || hash(body.resumeToken) !== found.resumeHash)
       return { ok: false, status: 404, error: "That response link isn't valid any more." };
     existing = found.response;
@@ -78,7 +78,7 @@ export async function submit(
       return { ok: true, data: { responseId: existing.id, endingId: existing.endingId, score: existing.score } };
   }
 
-  const answers: Answers = { ...(existing?.answers ?? {}), ...coerce(form, body.answers ?? {}) };
+  const answers: Answers = { ...(existing?.answers ?? {}), ...(await coerce(form, body.answers ?? {})) };
   // Answers the respondent cleared on the way back are removed.
   for (const [ref, value] of Object.entries(body.answers ?? {})) if (value === null) delete answers[ref];
   const hidden = existing?.hidden ?? cleanHidden(form, body.hidden);
@@ -124,19 +124,19 @@ export async function submit(
   let resumeToken: string | undefined;
   let resumeHash: string;
   if (existing) {
-    resumeHash = getResponse(existing.id)!.resumeHash;
+    resumeHash = (await getResponse(existing.id))!.resumeHash;
   } else {
     resumeToken = crypto.randomBytes(24).toString("base64url");
     resumeHash = hash(resumeToken);
   }
-  saveResponse(response, resumeHash);
+  await saveResponse(response, resumeHash);
 
   if (completedAt) await deliverWebhook(form, response);
   return { ok: true, data: { responseId: response.id, resumeToken, endingId, score: response.score } };
 }
 
-export function resume(form: Form, id: string, token: string): ResponseRecord | null {
-  const found = getResponse(id);
+export async function resume(form: Form, id: string, token: string): Promise<ResponseRecord | null> {
+  const found = await getResponse(id);
   if (!found || found.response.formId !== form.id || hash(token) !== found.resumeHash) return null;
   return found.response;
 }

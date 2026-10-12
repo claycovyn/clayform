@@ -8,7 +8,7 @@ export const metadata = { title: "Edit form" };
 
 export default async function EditPage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) redirect("/login");
-  const form = getForm((await params).id);
+  const form = await getForm((await params).id);
   if (!form) notFound();
   return <Builder initial={form} siteUrl={process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? ""} />;
 }

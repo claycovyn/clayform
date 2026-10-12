@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Player } from "@/components/player/Player";
 import { isAdmin } from "@/lib/auth";
 import { getFormBySlug } from "@/lib/db";
+import { maxUploadMb } from "@/lib/limits";
 import { closedReason } from "@/lib/submit";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const form = getFormBySlug((await params).slug);
+  const form = await getFormBySlug((await params).slug);
   if (!form) return { title: "Form not found" };
   return {
     title: { absolute: form.title },
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function FormPage({ params, searchParams }: Props) {
-  const form = getFormBySlug((await params).slug);
+  const form = await getFormBySlug((await params).slug);
   if (!form) notFound();
   const query = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -37,7 +38,7 @@ export default async function FormPage({ params, searchParams }: Props) {
 
   // Unpublished forms can be previewed by the owner but not answered.
   const draftPreview = form.status !== "published" && (await isAdmin());
-  const closed = draftPreview ? null : closedReason(form);
+  const closed = draftPreview ? null : await closedReason(form);
 
   return (
     <>
@@ -53,6 +54,7 @@ export default async function FormPage({ params, searchParams }: Props) {
         initialHidden={hidden}
         resumeParam={one(query.resume)}
         closedMessage={closed}
+        maxUploadMb={maxUploadMb()}
       />
     </>
   );

@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(req: Request, { params }: Params) {
   const denied = await requireAdmin();
   if (denied) return denied;
-  const form = getForm((await params).id);
+  const form = await getForm((await params).id);
   if (!form) return new Response("Not found", { status: 404 });
   const url = new URL(req.url);
   const format = url.searchParams.get("format") ?? "csv";
@@ -22,7 +22,7 @@ export async function GET(req: Request, { params }: Params) {
       headers: { "content-type": "application/json", "content-disposition": `attachment; filename="${name}.clayform.json"` },
     });
   }
-  const responses = listResponses(form.id).filter((r) =>
+  const responses = (await listResponses(form.id)).filter((r) =>
     status === "complete" ? r.completedAt : status === "partial" ? !r.completedAt : true,
   );
   if (format === "json") {

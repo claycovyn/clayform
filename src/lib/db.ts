@@ -1,151 +1,319 @@
-// Storage: one SQLite file using Node's built-in driver (no native modules,
-// no database server). Forms and responses are stored as JSON documents.
+// Storage. Two drivers behind one async interface:
+//  - Postgres when DATABASE_URL (or POSTGRES_URL) is set — Vercel, Neon, Supabase, any host.
+//  - SQLite otherwise, using Node's built-in driver: one file, no database server.
+// Forms and responses are stored as JSON documents; uploads live in the database
+// (Postgres) or on disk next to the SQLite file.
 import "server-only";
 import fs from "node:fs";
 import path from "node:path";
-import type { DatabaseSync as DB } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import type { Sql } from "postgres";
 import type { Form, FormStats, ResponseRecord } from "./types";
 
-export const DATA_DIR = path.resolve(process.env.CLAYFORM_DATA_DIR || "./data");
-export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
+export interface StoredFile {
+  id: string;
+  formId: string;
+  name: string;
+  type: string;
+  size: number;
+}
 
-let db: DB | null = null;
+interface Store {
+  listForms(): Promise<(Form & { stats: FormStats })[]>;
+  getForm(id: string): Promise<Form | null>;
+  getFormBySlug(slug: string): Promise<Form | null>;
+  slugTaken(slug: string, exceptId?: string): Promise<boolean>;
+  saveForm(form: Form): Promise<void>;
+  deleteForm(id: string): Promise<void>;
+  countView(formId: string): Promise<void>;
+  formStats(formId: string): Promise<FormStats>;
+  getResponse(id: string): Promise<{ response: ResponseRecord; resumeHash: string } | null>;
+  saveResponse(response: ResponseRecord, resumeHash: string): Promise<void>;
+  listResponses(formId: string): Promise<ResponseRecord[]>;
+  deleteResponses(formId: string, ids: string[]): Promise<void>;
+  saveFile(file: StoredFile, data: Buffer): Promise<void>;
+  getFile(id: string): Promise<StoredFile | null>;
+  readFile(id: string): Promise<Buffer | null>;
+}
 
-function open(): DB {
-  if (db) return db;
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  // getBuiltinModule keeps the bundler from trying to resolve node:sqlite.
-  const { DatabaseSync } = process.getBuiltinModule("node:sqlite") as typeof import("node:sqlite");
-  db = new DatabaseSync(path.join(DATA_DIR, "clayform.db"));
-  db.exec(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
-    CREATE TABLE IF NOT EXISTS forms (
-      id TEXT PRIMARY KEY,
-      slug TEXT NOT NULL UNIQUE,
-      doc TEXT NOT NULL,
-      views INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS responses (
-      id TEXT PRIMARY KEY,
-      form_id TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
-      resume_hash TEXT NOT NULL,
-      doc TEXT NOT NULL,
-      completed_at TEXT,
-      updated_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS responses_form ON responses(form_id, updated_at);
-    CREATE TABLE IF NOT EXISTS files (
-      id TEXT PRIMARY KEY,
-      form_id TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      type TEXT NOT NULL,
-      size INTEGER NOT NULL,
-      created_at TEXT NOT NULL
-    );
-  `);
-  return db;
+export const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
+
+/** On Vercel (and similar) the disk is temporary, so SQLite would silently lose data. */
+export function storageProblem(): string | null {
+  if (!DATABASE_URL && process.env.VERCEL)
+    return "Clayform needs a Postgres database on Vercel. Add one under Storage (Neon or Supabase), then redeploy.";
+  return null;
 }
 
 type Row = Record<string, unknown>;
+const toStats = (r: Row | undefined): FormStats => ({
+  views: Number(r?.views ?? 0),
+  starts: Number(r?.starts ?? 0),
+  completes: Number(r?.completes ?? 0),
+});
+const toFile = (r: Row): StoredFile => ({
+  id: String(r.id),
+  formId: String(r.form_id),
+  name: String(r.name),
+  type: String(r.type),
+  size: Number(r.size),
+});
+// Postgres returns jsonb as objects; SQLite returns text.
+const doc = <T>(v: unknown): T => (typeof v === "string" ? JSON.parse(v) : v) as T;
 
-export function listForms(): (Form & { stats: FormStats })[] {
-  const rows = open()
-    .prepare(
-      `SELECT f.doc, f.views,
-        (SELECT COUNT(*) FROM responses r WHERE r.form_id = f.id) AS starts,
-        (SELECT COUNT(*) FROM responses r WHERE r.form_id = f.id AND r.completed_at IS NOT NULL) AS completes
-       FROM forms f ORDER BY f.updated_at DESC`,
-    )
-    .all() as Row[];
-  return rows.map((r) => ({
-    ...(JSON.parse(String(r.doc)) as Form),
-    stats: { views: Number(r.views), starts: Number(r.starts), completes: Number(r.completes) },
-  }));
+// ---- SQLite ----------------------------------------------------------------
+
+function sqliteStore(): Store {
+  const dataDir = path.resolve(process.env.CLAYFORM_DATA_DIR || "./data");
+  const uploadDir = path.join(dataDir, "uploads");
+  let handle: DatabaseSync | null = null;
+
+  const db = (): DatabaseSync => {
+    if (handle) return handle;
+    fs.mkdirSync(uploadDir, { recursive: true });
+    // getBuiltinModule keeps the bundler from trying to resolve node:sqlite.
+    const { DatabaseSync } = process.getBuiltinModule("node:sqlite") as typeof import("node:sqlite");
+    handle = new DatabaseSync(path.join(dataDir, "clayform.db"));
+    handle.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA foreign_keys = ON;
+      CREATE TABLE IF NOT EXISTS forms (
+        id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, doc TEXT NOT NULL,
+        views INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS responses (
+        id TEXT PRIMARY KEY, form_id TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+        resume_hash TEXT NOT NULL, doc TEXT NOT NULL, completed_at TEXT, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS responses_form ON responses(form_id, updated_at);
+      CREATE TABLE IF NOT EXISTS files (
+        id TEXT PRIMARY KEY, form_id TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+        name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL
+      );
+    `);
+    return handle;
+  };
+  const statsSql = `SELECT f.views,
+      (SELECT COUNT(*) FROM responses r WHERE r.form_id = f.id) AS starts,
+      (SELECT COUNT(*) FROM responses r WHERE r.form_id = f.id AND r.completed_at IS NOT NULL) AS completes
+    FROM forms f`;
+
+  return {
+    async listForms() {
+      const rows = db().prepare(`${statsSql.replace("SELECT f.views", "SELECT f.doc, f.views")} ORDER BY f.updated_at DESC`).all() as Row[];
+      return rows.map((r) => ({ ...doc<Form>(r.doc), stats: toStats(r) }));
+    },
+    async getForm(id) {
+      const r = db().prepare("SELECT doc FROM forms WHERE id = ?").get(id) as Row | undefined;
+      return r ? doc<Form>(r.doc) : null;
+    },
+    async getFormBySlug(slug) {
+      const r = db().prepare("SELECT doc FROM forms WHERE slug = ?").get(slug) as Row | undefined;
+      return r ? doc<Form>(r.doc) : null;
+    },
+    async slugTaken(slug, exceptId) {
+      const r = db().prepare("SELECT id FROM forms WHERE slug = ?").get(slug) as Row | undefined;
+      return !!r && r.id !== exceptId;
+    },
+    async saveForm(form) {
+      db()
+        .prepare(
+          `INSERT INTO forms (id, slug, doc, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, doc = excluded.doc, updated_at = excluded.updated_at`,
+        )
+        .run(form.id, form.slug, JSON.stringify(form), form.createdAt, form.updatedAt);
+    },
+    async deleteForm(id) {
+      const files = db().prepare("SELECT id FROM files WHERE form_id = ?").all(id) as Row[];
+      for (const f of files) fs.rmSync(path.join(uploadDir, String(f.id)), { force: true });
+      db().prepare("DELETE FROM forms WHERE id = ?").run(id);
+    },
+    async countView(formId) {
+      db().prepare("UPDATE forms SET views = views + 1 WHERE id = ?").run(formId);
+    },
+    async formStats(formId) {
+      return toStats(db().prepare(`${statsSql} WHERE f.id = ?`).get(formId) as Row | undefined);
+    },
+    async getResponse(id) {
+      const r = db().prepare("SELECT doc, resume_hash FROM responses WHERE id = ?").get(id) as Row | undefined;
+      return r ? { response: doc<ResponseRecord>(r.doc), resumeHash: String(r.resume_hash) } : null;
+    },
+    async saveResponse(response, resumeHash) {
+      db()
+        .prepare(
+          `INSERT INTO responses (id, form_id, resume_hash, doc, completed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET doc = excluded.doc, completed_at = excluded.completed_at, updated_at = excluded.updated_at`,
+        )
+        .run(response.id, response.formId, resumeHash, JSON.stringify(response), response.completedAt, response.updatedAt);
+    },
+    async listResponses(formId) {
+      const rows = db().prepare("SELECT doc FROM responses WHERE form_id = ? ORDER BY updated_at DESC").all(formId) as Row[];
+      return rows.map((r) => doc<ResponseRecord>(r.doc));
+    },
+    async deleteResponses(formId, ids) {
+      const stmt = db().prepare("DELETE FROM responses WHERE form_id = ? AND id = ?");
+      for (const id of ids) stmt.run(formId, id);
+    },
+    async saveFile(file, data) {
+      db();
+      await fs.promises.writeFile(path.join(uploadDir, file.id), data);
+      db()
+        .prepare("INSERT INTO files (id, form_id, name, type, size, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(file.id, file.formId, file.name, file.type, file.size, new Date().toISOString());
+    },
+    async getFile(id) {
+      const r = db().prepare("SELECT * FROM files WHERE id = ?").get(id) as Row | undefined;
+      return r ? toFile(r) : null;
+    },
+    async readFile(id) {
+      return fs.promises.readFile(path.join(uploadDir, id)).catch(() => null);
+    },
+  };
 }
 
-export function getForm(id: string): Form | null {
-  const row = open().prepare("SELECT doc FROM forms WHERE id = ?").get(id) as Row | undefined;
-  return row ? (JSON.parse(String(row.doc)) as Form) : null;
+// ---- Postgres --------------------------------------------------------------
+
+function postgresStore(url: string): Store {
+  let client: Sql | null = null;
+  let ready: Promise<void> | null = null;
+
+  const sql = async (): Promise<Sql> => {
+    if (!client) {
+      const { default: postgres } = await import("postgres");
+      // prepare:false keeps it compatible with poolers (Neon, Supabase, PgBouncer).
+      client = postgres(url, { max: 3, prepare: false, idle_timeout: 20, onnotice: () => {} });
+    }
+    ready ??= client
+      .unsafe(
+        `CREATE TABLE IF NOT EXISTS clayform_forms (
+          id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, doc JSONB NOT NULL,
+          views INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL, updated_at TIMESTAMPTZ NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS clayform_responses (
+          id TEXT PRIMARY KEY, form_id TEXT NOT NULL REFERENCES clayform_forms(id) ON DELETE CASCADE,
+          resume_hash TEXT NOT NULL, doc JSONB NOT NULL, completed_at TIMESTAMPTZ, updated_at TIMESTAMPTZ NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS clayform_responses_form ON clayform_responses(form_id, updated_at);
+        CREATE TABLE IF NOT EXISTS clayform_files (
+          id TEXT PRIMARY KEY, form_id TEXT NOT NULL REFERENCES clayform_forms(id) ON DELETE CASCADE,
+          name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, data BYTEA NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );`,
+      )
+      .then(() => undefined)
+      .catch((e) => {
+        ready = null;
+        throw e;
+      });
+    await ready;
+    return client;
+  };
+
+  const stats = (q: Sql) => q`
+    f.views,
+    (SELECT COUNT(*) FROM clayform_responses r WHERE r.form_id = f.id) AS starts,
+    (SELECT COUNT(*) FROM clayform_responses r WHERE r.form_id = f.id AND r.completed_at IS NOT NULL) AS completes`;
+
+  return {
+    async listForms() {
+      const q = await sql();
+      const rows = await q`SELECT f.doc, ${stats(q)} FROM clayform_forms f ORDER BY f.updated_at DESC`;
+      return rows.map((r) => ({ ...doc<Form>(r.doc), stats: toStats(r) }));
+    },
+    async getForm(id) {
+      const q = await sql();
+      const [r] = await q`SELECT doc FROM clayform_forms WHERE id = ${id}`;
+      return r ? doc<Form>(r.doc) : null;
+    },
+    async getFormBySlug(slug) {
+      const q = await sql();
+      const [r] = await q`SELECT doc FROM clayform_forms WHERE slug = ${slug}`;
+      return r ? doc<Form>(r.doc) : null;
+    },
+    async slugTaken(slug, exceptId) {
+      const q = await sql();
+      const [r] = await q`SELECT id FROM clayform_forms WHERE slug = ${slug}`;
+      return !!r && r.id !== exceptId;
+    },
+    async saveForm(form) {
+      const q = await sql();
+      await q`INSERT INTO clayform_forms (id, slug, doc, created_at, updated_at)
+        VALUES (${form.id}, ${form.slug}, ${q.json(JSON.parse(JSON.stringify(form)))}, ${form.createdAt}, ${form.updatedAt})
+        ON CONFLICT (id) DO UPDATE SET slug = EXCLUDED.slug, doc = EXCLUDED.doc, updated_at = EXCLUDED.updated_at`;
+    },
+    async deleteForm(id) {
+      const q = await sql();
+      await q`DELETE FROM clayform_forms WHERE id = ${id}`;
+    },
+    async countView(formId) {
+      const q = await sql();
+      await q`UPDATE clayform_forms SET views = views + 1 WHERE id = ${formId}`;
+    },
+    async formStats(formId) {
+      const q = await sql();
+      const [r] = await q`SELECT ${stats(q)} FROM clayform_forms f WHERE f.id = ${formId}`;
+      return toStats(r);
+    },
+    async getResponse(id) {
+      const q = await sql();
+      const [r] = await q`SELECT doc, resume_hash FROM clayform_responses WHERE id = ${id}`;
+      return r ? { response: doc<ResponseRecord>(r.doc), resumeHash: String(r.resume_hash) } : null;
+    },
+    async saveResponse(response, resumeHash) {
+      const q = await sql();
+      await q`INSERT INTO clayform_responses (id, form_id, resume_hash, doc, completed_at, updated_at)
+        VALUES (${response.id}, ${response.formId}, ${resumeHash}, ${q.json(JSON.parse(JSON.stringify(response)))},
+                ${response.completedAt}, ${response.updatedAt})
+        ON CONFLICT (id) DO UPDATE SET doc = EXCLUDED.doc, completed_at = EXCLUDED.completed_at, updated_at = EXCLUDED.updated_at`;
+    },
+    async listResponses(formId) {
+      const q = await sql();
+      const rows = await q`SELECT doc FROM clayform_responses WHERE form_id = ${formId} ORDER BY updated_at DESC`;
+      return rows.map((r) => doc<ResponseRecord>(r.doc));
+    },
+    async deleteResponses(formId, ids) {
+      if (!ids.length) return;
+      const q = await sql();
+      await q`DELETE FROM clayform_responses WHERE form_id = ${formId} AND id IN ${q(ids)}`;
+    },
+    async saveFile(file, data) {
+      const q = await sql();
+      await q`INSERT INTO clayform_files (id, form_id, name, type, size, data)
+        VALUES (${file.id}, ${file.formId}, ${file.name}, ${file.type}, ${file.size}, ${data})`;
+    },
+    async getFile(id) {
+      const q = await sql();
+      const [r] = await q`SELECT id, form_id, name, type, size FROM clayform_files WHERE id = ${id}`;
+      return r ? toFile(r) : null;
+    },
+    async readFile(id) {
+      const q = await sql();
+      const [r] = await q`SELECT data FROM clayform_files WHERE id = ${id}`;
+      return r ? Buffer.from(r.data as Uint8Array) : null;
+    },
+  };
 }
 
-export function getFormBySlug(slug: string): Form | null {
-  const row = open().prepare("SELECT doc FROM forms WHERE slug = ?").get(slug) as Row | undefined;
-  return row ? (JSON.parse(String(row.doc)) as Form) : null;
+let store: Store | null = null;
+function s(): Store {
+  const problem = storageProblem();
+  if (problem) throw new Error(problem);
+  store ??= DATABASE_URL ? postgresStore(DATABASE_URL) : sqliteStore();
+  return store;
 }
 
-export function slugTaken(slug: string, exceptId?: string): boolean {
-  const row = open().prepare("SELECT id FROM forms WHERE slug = ?").get(slug) as Row | undefined;
-  return !!row && row.id !== exceptId;
-}
-
-export function saveForm(form: Form): void {
-  open()
-    .prepare(
-      `INSERT INTO forms (id, slug, doc, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, doc = excluded.doc, updated_at = excluded.updated_at`,
-    )
-    .run(form.id, form.slug, JSON.stringify(form), form.createdAt, form.updatedAt);
-}
-
-export function deleteForm(id: string): void {
-  const files = open().prepare("SELECT id FROM files WHERE form_id = ?").all(id) as Row[];
-  for (const f of files) fs.rmSync(path.join(UPLOAD_DIR, String(f.id)), { force: true });
-  open().prepare("DELETE FROM forms WHERE id = ?").run(id);
-}
-
-export function countView(formId: string): void {
-  open().prepare("UPDATE forms SET views = views + 1 WHERE id = ?").run(formId);
-}
-
-export function formStats(formId: string): FormStats {
-  const r = open()
-    .prepare(
-      `SELECT f.views,
-        (SELECT COUNT(*) FROM responses r WHERE r.form_id = f.id) AS starts,
-        (SELECT COUNT(*) FROM responses r WHERE r.form_id = f.id AND r.completed_at IS NOT NULL) AS completes
-       FROM forms f WHERE f.id = ?`,
-    )
-    .get(formId) as Row | undefined;
-  return { views: Number(r?.views ?? 0), starts: Number(r?.starts ?? 0), completes: Number(r?.completes ?? 0) };
-}
-
-export function getResponse(id: string): { response: ResponseRecord; resumeHash: string } | null {
-  const row = open().prepare("SELECT doc, resume_hash FROM responses WHERE id = ?").get(id) as Row | undefined;
-  return row ? { response: JSON.parse(String(row.doc)) as ResponseRecord, resumeHash: String(row.resume_hash) } : null;
-}
-
-export function saveResponse(response: ResponseRecord, resumeHash: string): void {
-  open()
-    .prepare(
-      `INSERT INTO responses (id, form_id, resume_hash, doc, completed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET doc = excluded.doc, completed_at = excluded.completed_at, updated_at = excluded.updated_at`,
-    )
-    .run(response.id, response.formId, resumeHash, JSON.stringify(response), response.completedAt, response.updatedAt);
-}
-
-export function listResponses(formId: string): ResponseRecord[] {
-  const rows = open()
-    .prepare("SELECT doc FROM responses WHERE form_id = ? ORDER BY updated_at DESC")
-    .all(formId) as Row[];
-  return rows.map((r) => JSON.parse(String(r.doc)) as ResponseRecord);
-}
-
-export function deleteResponses(formId: string, ids: string[]): void {
-  const stmt = open().prepare("DELETE FROM responses WHERE form_id = ? AND id = ?");
-  for (const id of ids) stmt.run(formId, id);
-}
-
-export function saveFile(file: { id: string; formId: string; name: string; type: string; size: number }): void {
-  open()
-    .prepare("INSERT INTO files (id, form_id, name, type, size, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(file.id, file.formId, file.name, file.type, file.size, new Date().toISOString());
-}
-
-export function getFile(id: string): { id: string; formId: string; name: string; type: string; size: number } | null {
-  const row = open().prepare("SELECT * FROM files WHERE id = ?").get(id) as Row | undefined;
-  if (!row) return null;
-  return { id: String(row.id), formId: String(row.form_id), name: String(row.name), type: String(row.type), size: Number(row.size) };
-}
+export const listForms = () => s().listForms();
+export const getForm = (id: string) => s().getForm(id);
+export const getFormBySlug = (slug: string) => s().getFormBySlug(slug);
+export const slugTaken = (slug: string, exceptId?: string) => s().slugTaken(slug, exceptId);
+export const saveForm = (form: Form) => s().saveForm(form);
+export const deleteForm = (id: string) => s().deleteForm(id);
+export const countView = (formId: string) => s().countView(formId);
+export const formStats = (formId: string) => s().formStats(formId);
+export const getResponse = (id: string) => s().getResponse(id);
+export const saveResponse = (response: ResponseRecord, resumeHash: string) => s().saveResponse(response, resumeHash);
+export const listResponses = (formId: string) => s().listResponses(formId);
+export const deleteResponses = (formId: string, ids: string[]) => s().deleteResponses(formId, ids);
+export const saveFile = (file: StoredFile, data: Buffer) => s().saveFile(file, data);
+export const getFile = (id: string) => s().getFile(id);
+export const readStoredFile = (id: string) => s().readFile(id);

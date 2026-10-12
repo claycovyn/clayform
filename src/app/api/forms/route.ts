@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const denied = await requireAdmin();
   if (denied) return denied;
-  return json({ forms: listForms() });
+  return json({ forms: await listForms() });
 }
 
 /** Create from a template ({ template }) or import a form JSON ({ form }). */
@@ -31,10 +31,10 @@ export async function POST(req: Request) {
     const template = TEMPLATES.find((t) => t.id === body.template) ?? TEMPLATES[0];
     form = template.build();
   }
-  while (slugTaken(form.slug)) form.slug = uid(8);
+  while (await slugTaken(form.slug)) form.slug = uid(8);
   const now = new Date().toISOString();
   form.createdAt = now;
   form.updatedAt = now;
-  saveForm(form);
+  await saveForm(form);
   return json({ form }, 201);
 }

@@ -18,6 +18,7 @@ export interface InputProps {
   slug: string;
   preview: boolean;
   seed: string;
+  maxUploadMb: number;
 }
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -523,12 +524,17 @@ function Ranking({ field, value, onChange, onSubmit, active, owner }: InputProps
   );
 }
 
-function FileUpload({ field, value, onChange, slug, preview }: InputProps) {
+function FileUpload({ field, value, onChange, slug, preview, maxUploadMb }: InputProps) {
   const [status, setStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [error, setError] = useState("");
   const file = value && typeof value === "object" && !Array.isArray(value) ? (value as FileAnswer) : null;
   async function upload(f: File) {
     setError("");
+    if (f.size > maxUploadMb * 1024 * 1024) {
+      setStatus("error");
+      setError(`That file is too big. The limit is ${maxUploadMb} MB.`);
+      return;
+    }
     if (preview) {
       onChange({ fileId: "preview", name: f.name, size: f.size, type: f.type });
       return;
@@ -563,7 +569,7 @@ function FileUpload({ field, value, onChange, slug, preview }: InputProps) {
         <span className="text-base">
           {status === "uploading" ? "Uploading…" : file ? `✓ ${file.name}` : "Choose a file, or drag it here"}
         </span>
-        <span className="text-xs opacity-60">{file ? `${(file.size / 1024).toFixed(0)} KB · click to replace` : "Up to 10 MB"}</span>
+        <span className="text-xs opacity-60">{file ? `${(file.size / 1024).toFixed(0)} KB · click to replace` : `Up to ${maxUploadMb} MB`}</span>
         <input
           type="file"
           className="sr-only"
