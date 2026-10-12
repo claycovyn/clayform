@@ -3,6 +3,8 @@ import { json, readJson } from "@/lib/api";
 import { claimOrphanForms, createUser, storageProblem } from "@/lib/db";
 import { uid } from "@/lib/fields";
 import { newUserPlan } from "@/lib/plans";
+import { siteUrl } from "@/lib/site";
+import { needsEmailVerification, sendVerification } from "@/lib/verify";
 import { clientIp, rateLimited } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
@@ -28,6 +30,7 @@ export async function POST(req: Request) {
   const user = { id: uid(16), email, name, passwordHash: await hashPassword(password), passwordChangedAt: now, createdAt: now, plan: newUserPlan() };
   if (!(await createUser(user))) return json({ error: "There's already an account with that email. Log in instead.", field: "email" }, 409);
   await claimOrphanForms(user.id);
+  if (needsEmailVerification(user)) await sendVerification(user, siteUrl(req));
   await startSession(user);
   return json({ ok: true }, 201);
 }

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { currentAdmin } from "@/lib/admin";
 import { saveUnitCosts, ZERO_COSTS, type UnitCosts } from "@/lib/costs";
-import { getForm, getUser, resolveReport, setTakedown, setUserPlan } from "@/lib/db";
-import { meter, type PlanId } from "@/lib/plans";
+import { getForm, getUser, resolveReport, setEmailVerified, setTakedown, setUserPlan } from "@/lib/db";
+import { CLOUD, meter, setPacks, type PlanId } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +16,23 @@ export async function POST(req: Request) {
   switch (s("action")) {
     case "plan": {
       const plan = s("plan") as PlanId;
-      if (!["free", "pro", "grandfathered"].includes(plan) || !(await getUser(s("userId")))) return back(req, "Unknown workspace or plan.", true);
+      if (!["free", "cloud", "grandfathered"].includes(plan) || !(await getUser(s("userId")))) return back(req, "Unknown workspace or plan.", true);
       await setUserPlan(s("userId"), plan);
       msg = `Plan set to ${plan}.`;
       break;
     }
+    case "packs": {
+      if (!(await getUser(s("userId")))) return back(req, "Unknown workspace.", true);
+      const packs = Object.fromEntries(CLOUD.packs.map((p) => [p.id, Math.max(0, Math.min(1000, Math.floor(Number(s(`pack_${p.id}`)) || 0)))]).filter(([, n]) => (n as number) > 0));
+      await setPacks(s("userId"), packs);
+      msg = "Packs saved.";
+      break;
+    }
+    case "verify":
+      if (!(await getUser(s("userId")))) return back(req, "Unknown workspace.", true);
+      await setEmailVerified(s("userId"), new Date().toISOString());
+      msg = "Email marked as confirmed.";
+      break;
     case "ticket":
       await meter(s("userId"), "support_tickets");
       msg = "Support ticket logged.";

@@ -18,8 +18,10 @@ export interface User {
   /** Changing the password signs out every other session. */
   passwordChangedAt: string;
   createdAt: string;
-  /** Cloud plan: "free" | "pro" | "grandfathered". Only enforced when CLAYFORM_CLOUD=1 (see lib/plans.ts). */
+  /** Cloud plan: "free" | "cloud" | "grandfathered" ("pro" is read as "cloud"). Only enforced when CLAYFORM_CLOUD=1. */
   plan?: string;
+  /** Set when the person clicked the link in the verification email. */
+  emailVerifiedAt?: string | null;
 }
 
 /** One metered quantity for one workspace on one UTC day. */
@@ -48,6 +50,7 @@ export interface AdminUserRow {
   createdAt: string;
   forms: number;
   storageBytes: number;
+  emailVerified: boolean;
 }
 
 /** An API key for agents and scripts. Only the SHA-256 of the secret is stored. */
@@ -133,6 +136,9 @@ interface Store {
   getTakedown(formId: string): Promise<{ reason: string; createdAt: string } | null>;
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;
+  /** Stored bytes for one workspace: form and response documents plus uploads. */
+  storageBytes(userId: string): Promise<number>;
+  setEmailVerified(id: string, at: string): Promise<void>;
   /** Published forms with their owner, for abuse scans. */
   publishedForms(): Promise<{ form: Form; ownerId: string | null }[]>;
 }
@@ -162,6 +168,7 @@ const toUser = (r: Row): User => ({
   passwordChangedAt: iso(r.password_changed_at),
   createdAt: iso(r.created_at),
   plan: r.plan ? String(r.plan) : "grandfathered",
+  emailVerifiedAt: r.email_verified_at ? iso(r.email_verified_at) : null,
 });
 const toReport = (r: Row): AbuseReport => ({
   id: String(r.id),
@@ -269,6 +276,7 @@ function sqliteStore(): Store {
     // Accounts that existed before Cloud plans keep no limits ("grandfathered"); new ones get a plan at sign-up.
     const userCols = handle.prepare("PRAGMA table_info(users)").all() as Row[];
     if (!userCols.some((c) => c.name === "plan")) handle.exec("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'grandfathered'");
+    if (!userCols.some((c) => c.name === "email_verified_at")) handle.exec("ALTER TABLE users ADD COLUMN email_verified_at TEXT");
     // Installs from before accounts existed: add the owner column.
     const cols = handle.prepare("PRAGMA table_info(forms)").all() as Row[];
     if (!cols.some((c) => c.name === "owner_id")) {
@@ -450,7 +458,7 @@ function sqliteStore(): Store {
     async adminUsers() {
       const rows = db()
         .prepare(
-          `SELECT u.id, u.email, u.name, u.plan, u.created_at,
+          `SELECT u.id, u.email, u.name, u.plan, u.created_at, u.email_verified_at,
             (SELECT COUNT(*) FROM forms f WHERE f.owner_id = u.id) AS forms,
             COALESCE((SELECT SUM(LENGTH(f.doc)) FROM forms f WHERE f.owner_id = u.id), 0)
             + COALESCE((SELECT SUM(LENGTH(r.doc)) FROM responses r JOIN forms f ON f.id = r.form_id WHERE f.owner_id = u.id), 0)
@@ -458,7 +466,7 @@ function sqliteStore(): Store {
           FROM users u ORDER BY u.created_at`,
         )
         .all() as Row[];
-      return rows.map((r) => ({ id: String(r.id), email: String(r.email), name: String(r.name), plan: String(r.plan), createdAt: iso(r.created_at), forms: Number(r.forms), storageBytes: Number(r.bytes) }));
+      return rows.map((r) => ({ id: String(r.id), email: String(r.email), name: String(r.name), plan: String(r.plan), createdAt: iso(r.created_at), forms: Number(r.forms), storageBytes: Number(r.bytes), emailVerified: !!r.email_verified_at }));
     },
     async createReport(r) {
       db().prepare("INSERT INTO reports (id, form_id, reason, details, created_at) VALUES (?, ?, ?, ?, ?)").run(r.id, r.formId, r.reason, r.details, r.createdAt);
@@ -484,6 +492,19 @@ function sqliteStore(): Store {
     },
     async setSetting(key, value) {
       db().prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+    },
+    async storageBytes(userId) {
+      const r = db()
+        .prepare(
+          `SELECT COALESCE((SELECT SUM(LENGTH(f.doc)) FROM forms f WHERE f.owner_id = ?), 0)
+            + COALESCE((SELECT SUM(LENGTH(r.doc)) FROM responses r JOIN forms f ON f.id = r.form_id WHERE f.owner_id = ?), 0)
+            + COALESCE((SELECT SUM(x.size) FROM files x JOIN forms f ON f.id = x.form_id WHERE f.owner_id = ?), 0) AS bytes`,
+        )
+        .get(userId, userId, userId) as Row;
+      return Number(r.bytes);
+    },
+    async setEmailVerified(id, at) {
+      db().prepare("UPDATE users SET email_verified_at = ? WHERE id = ?").run(at, id);
     },
     async publishedForms() {
       const rows = db().prepare("SELECT doc, owner_id FROM forms WHERE json_extract(doc, '$.status') = 'published' ORDER BY updated_at DESC LIMIT 2000").all() as Row[];
@@ -538,6 +559,7 @@ function postgresStore(url: string): Store {
         );
         CREATE INDEX IF NOT EXISTS clayform_api_keys_user ON clayform_api_keys(user_id, created_at);
         ALTER TABLE clayform_users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'grandfathered';
+        ALTER TABLE clayform_users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
         CREATE TABLE IF NOT EXISTS clayform_usage_daily (
           user_id TEXT NOT NULL REFERENCES clayform_users(id) ON DELETE CASCADE, day TEXT NOT NULL, metric TEXT NOT NULL,
           amount BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (user_id, day, metric)
@@ -734,13 +756,13 @@ function postgresStore(url: string): Store {
     },
     async adminUsers() {
       const q = await sql();
-      const rows = await q`SELECT u.id, u.email, u.name, u.plan, u.created_at,
+      const rows = await q`SELECT u.id, u.email, u.name, u.plan, u.created_at, u.email_verified_at,
           (SELECT COUNT(*) FROM clayform_forms f WHERE f.owner_id = u.id) AS forms,
           COALESCE((SELECT SUM(octet_length(f.doc::text)) FROM clayform_forms f WHERE f.owner_id = u.id), 0)
           + COALESCE((SELECT SUM(octet_length(r.doc::text)) FROM clayform_responses r JOIN clayform_forms f ON f.id = r.form_id WHERE f.owner_id = u.id), 0)
           + COALESCE((SELECT SUM(x.size) FROM clayform_files x JOIN clayform_forms f ON f.id = x.form_id WHERE f.owner_id = u.id), 0) AS bytes
         FROM clayform_users u ORDER BY u.created_at`;
-      return rows.map((r) => ({ id: String(r.id), email: String(r.email), name: String(r.name), plan: String(r.plan), createdAt: iso(r.created_at), forms: Number(r.forms), storageBytes: Number(r.bytes) }));
+      return rows.map((r) => ({ id: String(r.id), email: String(r.email), name: String(r.name), plan: String(r.plan), createdAt: iso(r.created_at), forms: Number(r.forms), storageBytes: Number(r.bytes), emailVerified: !!r.email_verified_at }));
     },
     async createReport(r) {
       const q = await sql();
@@ -773,6 +795,18 @@ function postgresStore(url: string): Store {
     async setSetting(key, value) {
       const q = await sql();
       await q`INSERT INTO clayform_settings (key, value) VALUES (${key}, ${value}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
+    },
+    async storageBytes(userId) {
+      const q = await sql();
+      const [r] = await q`SELECT
+          COALESCE((SELECT SUM(octet_length(f.doc::text)) FROM clayform_forms f WHERE f.owner_id = ${userId}), 0)
+          + COALESCE((SELECT SUM(octet_length(r.doc::text)) FROM clayform_responses r JOIN clayform_forms f ON f.id = r.form_id WHERE f.owner_id = ${userId}), 0)
+          + COALESCE((SELECT SUM(x.size) FROM clayform_files x JOIN clayform_forms f ON f.id = x.form_id WHERE f.owner_id = ${userId}), 0) AS bytes`;
+      return Number(r.bytes);
+    },
+    async setEmailVerified(id, at) {
+      const q = await sql();
+      await q`UPDATE clayform_users SET email_verified_at = ${at} WHERE id = ${id}`;
     },
     async publishedForms() {
       const q = await sql();
@@ -835,3 +869,5 @@ export const getTakedown = (formId: string) => s().getTakedown(formId);
 export const getSetting = (key: string) => s().getSetting(key);
 export const setSetting = (key: string, value: string) => s().setSetting(key, value);
 export const publishedForms = () => s().publishedForms();
+export const storageBytes = (userId: string) => s().storageBytes(userId);
+export const setEmailVerified = (id: string, at: string) => s().setEmailVerified(id, at);

@@ -7,27 +7,45 @@ This is for the hosted service (clayform.vercel.app). **Self-hosters don't need 
 
 | Variable | What it does |
 | --- | --- |
-| `CLAYFORM_CLOUD=1` | Enforces plan limits, shows **Report** on public forms, refuses to publish forms that collect credentials, and gives new sign-ups **Free Cloud** |
+| `CLAYFORM_CLOUD=1` | Enforces plan limits, shows **Report** on public forms, refuses to publish forms that collect credentials, gives new sign-ups **Free Cloud**, and adjusts the home page copy |
 | `CLAYFORM_ADMIN_EMAILS` | Comma-separated emails that can open `/admin` (signed in with a browser session) |
 | `CLAYFORM_SUPPORT_EMAIL` | Shown to owners whose form was taken down, so they can appeal |
 
-## Plans (`src/lib/plans.ts`)
+## Plans and limits (`src/lib/plans.ts`, limits from `openctrl.json`)
 
-| Plan | Price | Limits |
-| --- | --- | --- |
-| Free Cloud | $0 | 100 completed responses a month per workspace (UTC calendar month). Storage, upload and email caps: set from metering data before launch (build plan 7.2) |
-| Pro Cloud | $9/mo | No response cap (fair-use thresholds set from data before Pro launches) |
-| Early account (`grandfathered`) | $0 | No caps. Every account that existed before `CLAYFORM_CLOUD=1` was turned on keeps this |
+Limits live in this app's `openctrl.json` → `cloud` (meters, `free`, `fair_use`, `packs`) and are computed with the
+OPENCTRL kit (`entitlementLimits`, `usageStatus`), so every Original works the same way.
 
-At the limit, **new** respondents see "This form isn't taking new responses right now". People already part-way
-through can finish. Nothing is deleted, and export (JSON/CSV, API, MCP) keeps working. The owner sees the usage bar
-and the pause notice on the dashboard. Email notices come with an email provider (not set up yet). Until Stripe billing
-(build plan 7.3), an admin sets plans by hand on `/admin`.
+| Plan (`users.plan`) | Price | Limits | Going over |
+| --- | --- | --- | --- |
+| `free`: Free Cloud | $0 | `cloud.free` (Clayform: 100 completed responses a month, 0.25 GB storage) | New respondents see a pause notice (people mid-form can finish); new uploads are refused when storage is full. Prompt: join OPENCTRL Cloud |
+| `cloud`: OPENCTRL Cloud | $12/month for **every** Original | `cloud.fair_use` + packs (Clayform: 10,000 responses a month, 5 GB) | **Never paused.** Usage shows as over fair use, and the prompt is to add a pack |
+| `grandfathered`: Early account | $0 | None | Accounts that existed before `CLAYFORM_CLOUD=1` was turned on |
+
+Older rows with `plan = "pro"` are read as `cloud`. Packs (`responses_10k`, `storage_10gb`) and plans are set by an
+admin on `/admin` until OPENCTRL billing (build plan 7.3) sets them from Stripe. **No data is ever deleted for going
+over**, and export works on every plan.
+
+**Usage notices**: at 80% and 100% of each limited meter, once per meter per month, by email (needs Resend, below) and
+on the dashboard. Free: "Join OPENCTRL Cloud for $12/month". Subscribers: "Add a pack".
+
+**Email verification**: with Cloud on *and* email configured, a new account confirms its email before it can publish
+(link valid 3 days; "Resend link" on the dashboard; an admin can confirm by hand). Grandfathered accounts are treated as
+confirmed.
+
+## Email (Resend)
+
+| Variable | |
+| --- | --- |
+| `RESEND_API_KEY` | Resend API key. Without it nothing is sent (messages are logged), verification isn't required, and `/admin` warns |
+| `CLAYFORM_EMAIL_FROM` | Sender, e.g. `Clayform <hello@yourdomain>` (a domain verified in Resend). Required to send |
+| `OPENCTRL_CLOUD_URL` | Where "Upgrade" links go once OPENCTRL billing exists. Unset: "Coming soon" |
 
 ## Metering (from day one)
 
 Per workspace (the account), per UTC day, in `usage_daily`: `responses_started`, `responses_completed`,
-`uploads_bytes`, `api_requests` (API key and MCP calls), `emails_sent` (0 until email exists), `support_tickets`
+`uploads_bytes`, `api_requests` (API key and MCP calls), `emails_sent` (Clayform's own account and usage emails, for
+cost only; they never count against the workspace's "emails" limit), `support_tickets`
 (logged by an admin with **+1**). Stored bytes (form and response documents plus uploads) are measured live. Metering
 runs on self-hosted installs too, for their own numbers; a metering failure is logged and never breaks a request.
 
@@ -50,5 +68,4 @@ and margin for any month, lowest margin first, with totals.
   doesn't undo it; the owner sees "Removed" and the reason on their dashboard. **Restore** undoes it.
 - **Rate limits**: 120 submissions a minute per IP, 300 new responses a minute per workspace, 120 API requests a minute
   per key, 20 uploads a minute per IP.
-- **Not yet**: email verification before publishing, which needs an email provider. It's the next abuse step once
-  email is added.
+- **Email verification** before publishing (see above).

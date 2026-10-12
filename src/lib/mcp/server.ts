@@ -32,6 +32,7 @@ import {
 import { lintForm } from "../engine";
 import { publishRefusal } from "../abuse";
 import { cloudEnabled } from "../plans";
+import { needsEmailVerification, VERIFY_FIRST } from "../verify";
 import { webhookBlocked } from "../netguard";
 import { summarize } from "../stats";
 import { deliverWebhook } from "../submit";
@@ -138,7 +139,8 @@ const owned = async (c: Ctx, id: string): Promise<Form> => {
 /** Validate, keep the slug unique and save. */
 const save = async (c: Ctx, form: Form): Promise<Form> => {
     if (await slugTaken(form.slug, form.id)) throw new ToolError(`The link "${form.slug}" is already used by another form.`);
-    const refusal = cloudEnabled() && form.status === "published" ? publishRefusal(form) : null;
+    const refusal =
+      form.status === "published" && needsEmailVerification(c.context.user) ? VERIFY_FIRST : cloudEnabled() && form.status === "published" ? publishRefusal(form) : null;
     if (refusal) throw new ToolError(refusal);
     await saveForm(form, c.context.user.id);
     return form;

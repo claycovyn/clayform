@@ -5,7 +5,8 @@ import { currentAdmin } from "@/lib/admin";
 import { credentialProblems, impersonationSignals, REPORT_REASONS, type ReportReason } from "@/lib/abuse";
 import { UNIT_COST_LABELS, type UnitCosts } from "@/lib/costs";
 import { getForm, getTakedown, listReports, publishedForms } from "@/lib/db";
-import { cloudEnabled, PLANS } from "@/lib/plans";
+import { CLOUD, cloudEnabled, PLANS } from "@/lib/plans";
+import { emailConfigured } from "@/lib/email";
 import { workspaceReport } from "@/lib/workspaces";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
       </header>
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-8">
+        {cloudEnabled() && !emailConfigured() && (
+          <p role="alert" className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">
+            Email isn&apos;t configured (RESEND_API_KEY and CLAYFORM_EMAIL_FROM), so email verification and usage notices are off. Set them before launching Free Cloud.
+          </p>
+        )}
         {sp.ok && <p role="status" className="rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-800">{sp.ok}</p>}
         {sp.error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{sp.error}</p>}
 
@@ -43,7 +49,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 id="ws" className="font-display text-3xl font-extrabold">Workspaces · {label}</h1>
-              <p className="text-sm text-ink-soft">Sorted by margin, lowest first. Cost is an estimate from the unit costs below; revenue is the plan price until Stripe billing (build plan 7.3).</p>
+              <p className="text-sm text-ink-soft">Sorted by margin, lowest first. Cost is an estimate from the unit costs below. Revenue is the plan price set by hand until OPENCTRL billing (build plan 7.3); an OPENCTRL Cloud subscription ($12) covers every Original, so it isn't all Clayform&apos;s.</p>
             </div>
             <form className="flex items-center gap-2 text-sm">
               <label htmlFor="month" className="text-ink-soft">Month</label>
@@ -93,7 +99,27 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <td className={`${td} tabular-nums`}>{usd(r.costUsd)}</td>
                     <td className={`${td} tabular-nums`}>{usd(r.revenueUsd)}</td>
                     <td className={`${td} tabular-nums font-semibold ${r.marginUsd < 0 ? "text-red-600" : ""}`}>{usd(r.marginUsd)}</td>
-                    <td className={td} />
+                    <td className={td}>
+                      <details>
+                        <summary className="cursor-pointer text-xs font-semibold">Packs{Object.keys(r.packs).length ? ` (${Object.values(r.packs).reduce((a, b) => a + b, 0)})` : ""}</summary>
+                        <form action="/api/admin" method="post" className="mt-2 space-y-1">
+                          <input type="hidden" name="action" value="packs" /><input type="hidden" name="userId" value={r.id} />
+                          {CLOUD.packs.map((p) => (
+                            <label key={p.id} className="flex items-center gap-2 text-xs">
+                              <input name={`pack_${p.id}`} type="number" min={0} max={1000} defaultValue={r.packs[p.id] ?? 0} className="field w-16 py-0.5" />
+                              {p.label}
+                            </label>
+                          ))}
+                          <button className="btn-ghost px-2 py-1 text-xs">Save packs</button>
+                        </form>
+                      </details>
+                      {!r.emailVerified && r.plan !== "grandfathered" && (
+                        <form action="/api/admin" method="post" className="mt-1">
+                          <input type="hidden" name="action" value="verify" /><input type="hidden" name="userId" value={r.id} />
+                          <button className="btn-ghost px-2 py-1 text-xs">Confirm email</button>
+                        </form>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

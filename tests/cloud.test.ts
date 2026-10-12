@@ -51,8 +51,12 @@ describe("plans", () => {
     process.env.CLAYFORM_CLOUD = "1";
     expect(plans.newUserPlan()).toBe("free");
     expect(plans.planOf({ plan: undefined })).toBe("grandfathered");
-    expect(plans.PLANS.free.limits.responsesPerMonth).toBe(100);
-    expect(plans.PLANS.pro.priceCents).toBe(900);
+    expect(plans.CLOUD.free.responses).toBe(100);
+    expect(plans.PLANS.cloud.priceCents).toBe(1200);
+    expect(plans.planOf({ plan: "pro" })).toBe("cloud"); // older rows
+    // Limits come from openctrl.json via the kit.
+    const manifest = (await import("../openctrl.json")).default;
+    expect(plans.CLOUD.fair_use).toEqual(manifest.cloud.fair_use);
   });
 
   it("months are UTC calendar months", () => {
@@ -80,7 +84,8 @@ describe("metering and the Free Cloud limit", () => {
     await db.addUsage(u.id, "responses_completed", 99, plans.utcDay());
     expect((await answer(form)).ok).toBe(true); // the 100th
     const status = await plans.limitStatus(u);
-    expect(status).toMatchObject({ paused: true, responses: { used: 100, limit: 100 } });
+    expect(status.responsesPaused).toBe(true);
+    expect(status.meters.find((m) => m.meter === "responses")).toMatchObject({ used: 100, limit: 100, state: "over" });
 
     const blocked = await answer(form);
     expect(blocked).toMatchObject({ ok: false, status: 403, error: plans.PAUSED_MESSAGE });
@@ -98,7 +103,7 @@ describe("metering and the Free Cloud limit", () => {
   });
 
   it("never limits grandfathered or Pro workspaces, or anyone when Cloud is off", async () => {
-    for (const plan of ["grandfathered", "pro"]) {
+    for (const plan of ["grandfathered", "cloud"]) {
       process.env.CLAYFORM_CLOUD = "1";
       const u = await user(plan);
       const form = await publishedForm(u.id);
@@ -140,8 +145,8 @@ describe("cost to serve", () => {
     const { workspaceReport } = await import("@/lib/workspaces");
     const report = await workspaceReport();
     expect(report.rows.length).toBeGreaterThan(0);
-    const pro = report.rows.find((r) => r.plan === "pro")!;
-    expect(pro.revenueUsd).toBe(9);
+    const sub = report.rows.find((r) => r.plan === "cloud")!;
+    expect(sub.revenueUsd).toBe(12);
     expect(report.rows[0].marginUsd).toBeLessThanOrEqual(report.rows[report.rows.length - 1].marginUsd);
   });
 });
@@ -201,8 +206,113 @@ describe("abuse prevention", () => {
     expect(isAdmin({ email: "boss@example.com" })).toBe(true);
     expect(isAdmin({ email: "nobody@example.com" })).toBe(false);
     const route = await import("@/app/api/admin/route");
-    const res = await route.POST(new Request(`${ORIGIN}/api/admin`, { method: "POST", body: new URLSearchParams({ action: "plan", userId: "x", plan: "pro" }) }));
+    const res = await route.POST(new Request(`${ORIGIN}/api/admin`, { method: "POST", body: new URLSearchParams({ action: "plan", userId: "x", plan: "cloud" }) }));
     expect(res.status).toBe(404);
     delete process.env.CLAYFORM_ADMIN_EMAILS;
+  });
+});
+
+describe("the $12 model: fair use, packs, storage, notices, verification", () => {
+  it("never pauses an OPENCTRL Cloud subscriber over fair use; packs raise the limit", async () => {
+    process.env.CLAYFORM_CLOUD = "1";
+    const u = await user("cloud");
+    const form = await publishedForm(u.id);
+    await db.addUsage(u.id, "responses_completed", plans.CLOUD.fair_use.responses + 50, plans.utcDay());
+    let status = await plans.limitStatus(u);
+    expect(status.meters.find((m) => m.meter === "responses")?.state).toBe("over");
+    expect(status.responsesPaused).toBe(false);
+    expect((await answer(form)).ok).toBe(true);
+    await plans.setPacks(u.id, { responses_10k: 1 });
+    status = await plans.limitStatus(u);
+    expect(status.limits.responses).toBe(plans.CLOUD.fair_use.responses + 10000);
+    expect(status.meters.find((m) => m.meter === "responses")?.state).toBe("ok");
+  });
+
+  it("Free storage over its limit refuses new uploads, not answers", async () => {
+    process.env.CLAYFORM_CLOUD = "1";
+    const u = await user("free");
+    const form = await publishedForm(u.id, [{ type: "file_upload", title: "A file?", ref: "file" } as never]);
+    // A file record that claims more than the Free storage (stored bytes count the recorded size).
+    await db.saveFile({ id: `big${n}${Date.now()}`, formId: form.id, name: "big.bin", type: "application/octet-stream", size: Math.ceil(plans.CLOUD.free.storage * 1024 ** 3) + 10 }, Buffer.from("x"));
+    expect(await plans.uploadsPaused(u.id)).toBe(true);
+    const upload = await import("@/app/api/f/[slug]/upload/route");
+    const fd = new FormData();
+    fd.set("file", new File([new Uint8Array(10)], "a.bin"));
+    const res = await upload.POST(new Request(`${ORIGIN}/api/f/${form.slug}/upload`, { method: "POST", body: fd, headers: { "x-forwarded-for": "10.0.0.77" } }), { params: Promise.resolve({ slug: form.slug }) });
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe(plans.UPLOADS_PAUSED_MESSAGE);
+  });
+
+  it("sends each 80% and 100% notice once a month, with the right offer, and never says data was deleted", async () => {
+    process.env.CLAYFORM_CLOUD = "1";
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.CLAYFORM_EMAIL_FROM = "Clayform <hello@example.com>";
+    const sent: { to: string; subject: string; text: string }[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      if (String(url).includes("api.resend.com")) {
+        const b = JSON.parse(String(init.body));
+        sent.push({ to: b.to[0], subject: b.subject, text: b.text });
+        return new Response("{}", { status: 200 });
+      }
+      return realFetch(url, init);
+    }) as typeof fetch;
+    try {
+      const u = await user("free");
+      const form = await publishedForm(u.id);
+      await db.addUsage(u.id, "responses_completed", 79, plans.utcDay());
+      await answer(form); // 80
+      await answer(form); // 81: no second 80% notice
+      expect(sent.map((x) => x.subject)).toEqual(["Clayform: you've used 80% of your responses"]);
+      await db.addUsage(u.id, "responses_completed", 18, plans.utcDay());
+      await answer(form); // 100
+      expect(sent).toHaveLength(2);
+      expect(sent[1].subject).toMatch(/reached your responses limit/);
+      expect(sent[1].text).toMatch(/Join OPENCTRL Cloud for \$12\/month/);
+      expect(sent[1].text).toMatch(/Nothing has been deleted/);
+      expect((await plans.monthUsage(u.id)).emails_sent).toBe(2);
+
+      const sub = await user("cloud");
+      const status = await plans.limitStatus(sub);
+      const m = { ...status.meters.find((x) => x.meter === "responses")!, used: 10_000, limit: 10_000, state: "over" as const };
+      const note = plans.noticeFor(status, m, 100);
+      expect(note.body).toMatch(/Add a pack/);
+      expect(note.body).not.toMatch(/stopped/);
+    } finally {
+      globalThis.fetch = realFetch;
+      delete process.env.RESEND_API_KEY;
+      delete process.env.CLAYFORM_EMAIL_FROM;
+    }
+  });
+
+  it("requires a confirmed email to publish on the Cloud once email is set up", async () => {
+    const verify = await import("@/lib/verify");
+    const u = await user("free");
+    process.env.CLAYFORM_CLOUD = "1";
+    expect(verify.needsEmailVerification(u)).toBe(false); // email not configured: not required
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.CLAYFORM_EMAIL_FROM = "Clayform <hello@example.com>";
+    try {
+      expect(verify.needsEmailVerification(u)).toBe(true);
+      expect(verify.needsEmailVerification({ plan: "grandfathered", emailVerifiedAt: null })).toBe(false);
+      const draft = formOps.createForm("Hello", [{ type: "short_text", title: "Name?", ref: "n" }]);
+      await db.saveForm(draft, u.id);
+      const { secret } = await keys.issueApiKey(u.id, "w", ["forms:read", "forms:write"]);
+      const route = await import("@/app/api/forms/[id]/route");
+      const put = () => route.PUT(new Request(`${ORIGIN}/api/forms/${draft.id}`, { method: "PUT", headers: { authorization: `Bearer ${secret}` }, body: JSON.stringify({ ...draft, status: "published" }) }), { params: Promise.resolve({ id: draft.id }) });
+      const blocked = await put();
+      expect(blocked.status).toBe(422);
+      expect((await blocked.json()).error).toBe(verify.VERIFY_FIRST);
+      // The link from the email confirms it.
+      const link = new URL(verify.verificationLink(u, ORIGIN));
+      const v = await import("@/app/api/verify/route");
+      expect((await v.GET(new Request(link.toString().replace(/sig=[^&]+/, "sig=bad")))).headers.get("location")).toMatch(/verified=0/);
+      expect((await v.GET(new Request(link.toString()))).headers.get("location")).toMatch(/verified=1/);
+      expect((await put()).status).toBe(200);
+      expect(verify.validVerification(u, link.searchParams.get("exp"), link.searchParams.get("sig"), Date.now() + 4 * 86400_000)).toBe(false);
+    } finally {
+      delete process.env.RESEND_API_KEY;
+      delete process.env.CLAYFORM_EMAIL_FROM;
+    }
   });
 });

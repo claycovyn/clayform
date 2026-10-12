@@ -3,6 +3,7 @@ import { Logo, LogoMark } from "@/components/Logo";
 import { Player } from "@/components/player/Player";
 import { blankForm, choice, newField, THEME_PRESETS, uid } from "@/lib/fields";
 import type { Form } from "@/lib/types";
+import { CLOUD, cloudEnabled } from "@/lib/plans";
 
 // Where this install's source lives. Self-hosters running a modified copy set CLAYFORM_SOURCE_URL (AGPL section 13).
 const REPO = process.env.CLAYFORM_SOURCE_URL || "https://github.com/claycovyn/clayform";
@@ -34,7 +35,7 @@ function demoForm(): Form {
 }
 
 const FEATURES: [string, string][] = [
-  ["No response limits", "Your server, your database. A form never stops collecting because you hit a monthly cap."],
+  ["No response limits on your own server", "Self-host it and a form never stops collecting because of a monthly cap. Hosted? Generous fair-use limits."],
   ["Everything unlocked", "Logic jumps, scoring, hidden fields, file uploads, webhooks, custom endings. No tiers."],
   ["Partial responses", "Answers save as people go. See exactly where they stop, and let them finish later — even on another device."],
   ["Two layouts", "One question at a time for completion, or a classic one-page form when speed matters. Switch anytime."],
@@ -57,6 +58,9 @@ export default function Home() {
           <a href={REPO} className="btn-ghost hidden sm:inline-flex">
             GitHub
           </a>
+          <Link href="/pricing" className="btn-ghost">
+            Pricing
+          </Link>
           <Link href="/login" className="btn-ghost">
             Log in
           </Link>
@@ -77,7 +81,10 @@ export default function Home() {
             </h1>
             <p className="mt-6 max-w-xl text-lg text-ink-soft">
               Clayform is a beautiful, conversational form builder you own. One question at a time, logic, scoring, file uploads and real analytics — with no
-              response caps, no paywalled features and no monthly bill.
+              paywalled features.{" "}
+              {cloudEnabled()
+                ? `Self-host it free with no response caps, or start free here (${CLOUD.free.responses} responses a month) and go further with OPENCTRL Cloud.`
+                : "No response caps and no monthly bill."}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="btn-brand px-6 py-3 text-base">
@@ -151,6 +158,7 @@ export default function Home() {
 
       <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-ink-soft">
         <Logo size={22} />
+        <Link href="/pricing" className="underline underline-offset-2">Pricing</Link>
         <p>Open source under the <a className="underline underline-offset-2" href={`${REPO}/blob/main/LICENSE`}>AGPL-3.0</a>. Not affiliated with any other form company.</p>
       </footer>
     </div>

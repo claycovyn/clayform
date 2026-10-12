@@ -3,7 +3,7 @@ import "server-only";
 import crypto from "node:crypto";
 import { computeScore, fieldByRef, isEmpty, isQuestion, resolvePath, validateAnswer } from "./engine";
 import { formOwner, formStats, getFile, getResponse, getTakedown, saveResponse } from "./db";
-import { meter, newResponsesPaused, PAUSED_MESSAGE } from "./plans";
+import { checkUsageNotices, meter, newResponsesPaused, PAUSED_MESSAGE } from "./plans";
 import { rateLimited } from "./rateLimit";
 import { hash } from "./auth";
 import { uid } from "./fields";
@@ -144,7 +144,10 @@ export async function submit(
   }
   await saveResponse(response, resumeHash);
   if (!existing) await meter(ownerId, "responses_started");
-  if (completedAt) await meter(ownerId, "responses_completed");
+  if (completedAt) {
+    await meter(ownerId, "responses_completed");
+    await checkUsageNotices(ownerId);
+  }
 
   if (completedAt) await deliverWebhook(form, response);
   return { ok: true, data: { responseId: response.id, resumeToken, endingId, score: response.score } };

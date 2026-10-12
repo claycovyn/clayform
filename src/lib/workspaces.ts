@@ -2,7 +2,8 @@
 import "server-only";
 import { adminUsers, usageRows } from "./db";
 import { estimateCost, getUnitCosts, type UnitCosts } from "./costs";
-import { emptyUsage, monthOf, planOf, PLANS, type Metric, type PlanId, type Usage } from "./plans";
+import { entitlementLimits, usageStatus } from "./mcp-kit";
+import { CLOUD, emptyUsage, getPacks, monthOf, planOf, PLANS, type Metric, type PlanId, type Usage } from "./plans";
 
 export interface WorkspaceRow {
   id: string;
@@ -14,15 +15,21 @@ export interface WorkspaceRow {
   storageBytes: number;
   usage: Usage;
   costUsd: number;
-  /** Plan price while billing is manual (build plan 7.3 replaces this with Stripe revenue). */
+  /**
+   * Plan price while billing is manual. An OPENCTRL Cloud subscription ($12) covers every Original, so this is the
+   * whole subscription until OPENCTRL allocates revenue across apps (build plan 7.3 / 7.8).
+   */
   revenueUsd: number;
   marginUsd: number;
   overLimit: boolean;
+  packs: Record<string, number>;
+  emailVerified: boolean;
 }
 
-export async function workspaceReport(month = new Date()): Promise<{ rows: WorkspaceRow[]; units: UnitCosts; label: string; totals: Omit<WorkspaceRow, "id" | "email" | "name" | "plan" | "createdAt" | "overLimit"> }> {
+export async function workspaceReport(month = new Date()): Promise<{ rows: WorkspaceRow[]; units: UnitCosts; label: string; totals: Omit<WorkspaceRow, "id" | "email" | "name" | "plan" | "createdAt" | "overLimit" | "packs" | "emailVerified"> }> {
   const { from, to, label } = monthOf(month);
   const [users, usage, units] = await Promise.all([adminUsers(), usageRows(from, to), getUnitCosts()]);
+  const packs = new Map(await Promise.all(users.map(async (u) => [u.id, await getPacks(u.id)] as const)));
   const byUser = new Map<string, Usage>();
   for (const r of usage) {
     const u = byUser.get(r.userId) ?? emptyUsage();
@@ -34,8 +41,9 @@ export async function workspaceReport(month = new Date()): Promise<{ rows: Works
     const use = byUser.get(u.id) ?? emptyUsage();
     const costUsd = estimateCost(use, u.storageBytes, units, users.length);
     const revenueUsd = PLANS[plan].priceCents / 100;
-    const limit = PLANS[plan].limits.responsesPerMonth;
-    return { ...u, plan, usage: use, costUsd, revenueUsd, marginUsd: Math.round((revenueUsd - costUsd) * 10000) / 10000, overLimit: limit !== null && use.responses_completed >= limit };
+    const limits = entitlementLimits(CLOUD, PLANS[plan].tier, packs.get(u.id) ?? {});
+    const status = usageStatus(CLOUD, limits, { responses: use.responses_completed, storage: u.storageBytes / 1024 ** 3, emails: 0 });
+    return { ...u, plan, usage: use, costUsd, revenueUsd, marginUsd: Math.round((revenueUsd - costUsd) * 10000) / 10000, overLimit: status.some((m) => m.state === "over"), packs: packs.get(u.id) ?? {} };
   });
   rows.sort((a, b) => a.marginUsd - b.marginUsd || b.usage.responses_started - a.usage.responses_started);
   const totals = rows.reduce(

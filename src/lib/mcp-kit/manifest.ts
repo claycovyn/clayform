@@ -7,6 +7,51 @@ const https = z.string().url().refine((v) => v.startsWith("https://"), "Must be 
 
 export const MANIFEST_VERSION = 1;
 
+const meterKey = z.string().regex(/^[a-z][a-z0-9_]{1,40}$/, "Meter names are lowercase letters, digits and _.");
+const amounts = z.record(meterKey, z.number().min(0));
+
+/**
+ * OPENCTRL Cloud: what the app needs to run, what it meters, its Free tier, the fair-use limits an OPENCTRL Cloud
+ * subscriber gets, and add-on pack sizes. Prices are never here: they live in Stripe, set by OPENCTRL.
+ */
+export const cloudSchema = z
+  .object({
+    eligible: z.boolean(),
+    needs: z
+      .object({
+        database: z.enum(["postgres", "sqlite", "none"]).default("postgres"),
+        objectStorage: z.boolean().default(false),
+        email: z.boolean().default(false),
+        workers: z.boolean().default(false),
+        gpu: z.boolean().default(false),
+      })
+      .default({}),
+    meters: z.record(meterKey, z.object({ unit: z.string().min(1).max(40), period: z.enum(["month", "current"]) })),
+    free: amounts,
+    fair_use: amounts,
+    packs: z
+      .array(z.object({ id: z.string().regex(/^[a-z0-9_]{2,40}$/), label: z.string().min(1).max(80), adds: amounts }))
+      .max(20)
+      .default([]),
+    /** Path (on the app) of the full-export endpoint, for the Cloud contract. */
+    export: z.string().regex(/^\/[A-Za-z0-9/_-]*$/).optional(),
+  })
+  .superRefine((c, ctx) => {
+    const declared = new Set(Object.keys(c.meters));
+    const check = (rec: Record<string, number>, path: (string | number)[]) => {
+      for (const k of Object.keys(rec)) if (!declared.has(k)) ctx.addIssue({ code: "custom", path: [...path, k], message: `"${k}" isn't a declared meter.` });
+    };
+    check(c.free, ["free"]);
+    check(c.fair_use, ["fair_use"]);
+    c.packs.forEach((p, i) => check(p.adds, ["packs", i, "adds"]));
+    for (const k of declared) {
+      if (c.fair_use[k] === undefined) ctx.addIssue({ code: "custom", path: ["fair_use", k], message: `Give "${k}" a fair-use limit.` });
+      if (c.free[k] !== undefined && c.fair_use[k] !== undefined && c.free[k] > c.fair_use[k])
+        ctx.addIssue({ code: "custom", path: ["free", k], message: `The Free limit for "${k}" is above its fair-use limit.` });
+    }
+    if (new Set(c.packs.map((p) => p.id)).size !== c.packs.length) ctx.addIssue({ code: "custom", path: ["packs"], message: "Pack ids must be unique." });
+  });
+
 export const manifestSchema = z
   .object({
     openctrl: z.literal(MANIFEST_VERSION).describe("Manifest format version."),
@@ -41,8 +86,11 @@ export const manifestSchema = z
         docs: https.optional(),
       })
       .optional(),
+    cloud: cloudSchema.optional(),
   })
   .strict();
+
+export type CloudSpec = z.infer<typeof cloudSchema>;
 
 export type OpenCtrlManifest = z.infer<typeof manifestSchema>;
 export type OpenCtrlManifestInput = z.input<typeof manifestSchema>;
