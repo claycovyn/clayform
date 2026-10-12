@@ -164,6 +164,9 @@ The same keys work on the JSON API (`/api/forms`, `/api/forms/:id`, `/api/forms/
 `/api/forms/:id/export`), each route checking the key's permissions. Keys are limited to 120 requests a minute and can
 be revoked at any time. Key management itself (and account settings) only works signed in, never with a key.
 
+Clayform also publishes an [`openctrl.json`](openctrl.json) manifest (served at `/openctrl.json`) so
+[OPENCTRL](https://github.com/claycovyn/openctrl) can list it as "Works with AI" and show agents how to connect.
+
 Try it with the MCP Inspector: `npx @modelcontextprotocol/inspector`, transport “Streamable HTTP”, your URL, and the
 `Authorization` header.
 
@@ -185,7 +188,8 @@ src/
   lib/db.ts            storage (SQLite or Postgres)
   lib/formOps.ts       validated single-step form edits (used by the MCP server)
   lib/apiKeys.ts       API keys and permissions
-  lib/mcp/             the MCP server and its HTTP handler
+  lib/mcp/             the MCP server's tools and its HTTP handler
+  lib/mcp-kit/         shared OPENCTRL MCP kit (vendored; don't edit here)
   components/player/   the form respondents see
   components/builder/  build, logic, design, settings, share
   components/results/  summary, responses, drop-off

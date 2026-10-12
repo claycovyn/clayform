@@ -2,11 +2,15 @@
 // time. Pure: each function takes a form and returns a new one (or throws FormOpError with a message a person or an
 // AI agent can act on). Ids and keys are generated here, never trusted from the caller.
 import { lintForm } from "./engine";
+import { ToolError } from "./mcp-kit/tools";
 import { blankForm, choice as makeChoice, FIELD_TYPES, newField, THEME_PRESETS, uid } from "./fields";
 import { parseForm } from "./schema";
 import type { Choice, Condition, Ending, Field, FieldType, Form, FormSettings, LogicRule, Operator, Theme, Welcome } from "./types";
 
-export class FormOpError extends Error {}
+/** A ToolError, so the MCP kit shows its message to the agent as-is. */
+export class FormOpError extends ToolError {
+  override name = "ToolError";
+}
 
 const REF_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const CHOICE_TYPES: FieldType[] = ["multiple_choice", "picture_choice", "dropdown", "ranking"];

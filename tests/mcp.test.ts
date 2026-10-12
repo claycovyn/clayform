@@ -240,3 +240,15 @@ describe("REST API with keys", () => {
     expect(validFileSignature("file123", u.searchParams.get("exp"), u.searchParams.get("sig"), now + 61_000)).toBe(false);
   });
 });
+
+describe("openctrl.json", () => {
+  it("is a valid manifest that matches the real tools and scopes", async () => {
+    const manifest = (await import("../openctrl.json")).default;
+    const { parseManifest } = await import("@/lib/mcp-kit");
+    const { TOOLS } = await import("@/lib/mcp/server");
+    const parsed = parseManifest(manifest);
+    expect(parsed.ok, !parsed.ok ? parsed.error : "").toBe(true);
+    expect([...manifest.mcp.tools].sort()).toEqual(TOOLS.map((t) => t.name).sort());
+    expect(Object.fromEntries(manifest.mcp.scopes.map((s) => [s.name, s.description]))).toEqual(keys.SCOPES);
+  });
+});

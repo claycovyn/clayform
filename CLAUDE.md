@@ -23,6 +23,10 @@ user's `passwordChangedAt`). Every form has an `owner_id`; admin routes go throu
   `src/lib/formOps.ts` (pure; throws `FormOpError` with a message the agent can act on). Add a tool there with a scope,
   annotations (`readOnly` / `destructive`) and a test in `tests/mcp.test.ts`. Reference: `docs/MCP.md`.
 - Routes: `/api/mcp` and `/api/mcp/mcp`. Uploaded files reach agents as 15-minute signed links (`src/lib/fileLinks.ts`).
+- The MCP plumbing (key format, `createOpenCtrlMcp`, `defineTool`, manifest schema) is `src/lib/mcp-kit/`, **vendored**
+  from `packages/mcp-kit` in the OPENCTRL repo. Don't edit it here; change it there and copy `src/*.ts` back.
+- `openctrl.json` (repo root, served at `/openctrl.json`) is the OPENCTRL manifest. `tests/mcp.test.ts` fails if its
+  tools or scopes drift from the code.
 
 ## Hosting
 - GitHub: https://github.com/claycovyn/clayform (public, default branch `main`).

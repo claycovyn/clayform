@@ -1,0 +1,34 @@
+{
+  "openctrl": 1,
+  "name": "Clayform",
+  "tagline": "Forms people actually finish.",
+  "alternative_to": ["Typeform", "Google Forms", "Jotform", "SurveyMonkey"],
+  "category": "forms-surveys",
+  "website": "https://clayform.vercel.app",
+  "repository": "https://github.com/claycovyn/clayform",
+  "license": "MIT",
+  "icon": "https://clayform.vercel.app/icon-512.png",
+  "pricing": { "model": "free", "notes": "Free on clayform.vercel.app and free to self-host. No response limits." },
+  "savings_pct": null,
+  "mcp": {
+    "url": "https://clayform.vercel.app/api/mcp",
+    "transport": "streamable-http",
+    "auth": "api_key",
+    "get_key_url": "https://clayform.vercel.app/account",
+    "header": "Authorization: Bearer <key>",
+    "scopes": [
+      { "name": "forms:read", "description": "See your forms and their share links" },
+      { "name": "forms:write", "description": "Create, edit, publish and delete forms" },
+      { "name": "responses:read", "description": "Read responses, stats, exports and uploaded files" },
+      { "name": "responses:delete", "description": "Delete responses" },
+      { "name": "webhooks:write", "description": "Set and test webhooks" }
+    ],
+    "tools": [
+      "list_field_types", "list_forms", "get_form", "create_form", "update_form", "delete_form", "add_field", "update_field",
+      "remove_field", "reorder_fields", "set_logic", "set_endings", "set_theme", "update_settings", "publish_form",
+      "unpublish_form", "get_share_links", "list_responses", "get_response", "get_stats", "export_responses",
+      "delete_responses", "get_file", "set_webhook", "test_webhook"
+    ],
+    "docs": "https://github.com/claycovyn/clayform/blob/main/docs/MCP.md"
+  }
+}
