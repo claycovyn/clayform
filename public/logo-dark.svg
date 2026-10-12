@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" role="img" aria-label="Clayform">
+  <rect width="64" height="64" rx="18" fill="#D4683F"/>
+  <path d="M40.4 19.6A15 15 0 1 0 40.4 44.4" fill="none" stroke="#FBF6EE" stroke-width="8.5" stroke-linecap="round"/>
+  <rect x="46.5" y="20.5" width="5" height="23" rx="2.5" fill="#1B1714"/>
+  <text x="80" y="46" font-family="Fraunces, Georgia, 'Times New Roman', serif" font-size="42" font-weight="700" letter-spacing="-1.5" fill="#FBF6EE">clayform</text>
+</svg>
