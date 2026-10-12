@@ -61,12 +61,12 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and click **Open dashboard**. In development the dashboard is open without a password.
+Open http://localhost:3000, click **Sign up free** and create your account. Everyone who signs up gets their own private dashboard.
 
 ### Run it for real
 
 ```bash
-cp .env.example .env.local     # set CLAYFORM_PASSWORD and CLAYFORM_SECRET
+cp .env.example .env.local     # set CLAYFORM_SECRET
 npm run build
 npm start
 ```
@@ -74,7 +74,7 @@ npm start
 ### Docker
 
 ```bash
-CLAYFORM_PASSWORD=choose-something-long docker compose up -d
+CLAYFORM_SECRET=$(openssl rand -hex 32) docker compose up -d
 ```
 
 Data (the SQLite database and uploaded files) lives in the `clayform-data` volume. Back it up by copying `/data`.
@@ -84,10 +84,11 @@ Data (the SQLite database and uploaded files) lives in the `clayform-data` volum
 Vercel's servers have no permanent disk, so on Vercel Clayform stores everything in Postgres. A free Neon or Supabase database is enough.
 
 1. On [vercel.com/new](https://vercel.com/new), import this repository (or your fork).
-2. Under **Environment Variables**, add `CLAYFORM_PASSWORD` (your dashboard password) and `CLAYFORM_SECRET` (any long random string). Click **Deploy**.
+2. Under **Environment Variables**, add `CLAYFORM_SECRET` (any long random string). Click **Deploy**.
 3. In the new project, open **Storage → Create Database**, pick **Neon** (Postgres, free tier), and connect it to the project. This adds `DATABASE_URL` for you.
 4. Open **Deployments**, click the **⋯** menu on the latest deployment, and choose **Redeploy**. Clayform creates its tables on first use.
-5. Optional: set `NEXT_PUBLIC_SITE_URL` to your domain so share links and embed code use it.
+5. Open your site and click **Sign up free**. Your account is the first one; anyone else can sign up too unless you set `CLAYFORM_SIGNUPS=closed`.
+6. Optional: set `NEXT_PUBLIC_SITE_URL` to your domain so share links and embed code use it.
 
 On Vercel, file uploads are capped at 4 MB (Vercel's request-size limit). Files are stored in the database.
 
@@ -95,8 +96,9 @@ On Vercel, file uploads are capped at 4 MB (Vercel's request-size limit). Files 
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `CLAYFORM_PASSWORD` | — | Dashboard password. **Required in production**; without it the dashboard stays locked. |
-| `CLAYFORM_SECRET` | password | Signs the session cookie. Use `openssl rand -hex 32`. |
+| `CLAYFORM_SECRET` | — | Signs login sessions. **Required in production.** Use `openssl rand -hex 32`. |
+| `CLAYFORM_SIGNUPS` | `open` | Set to `closed` to stop new accounts (for a private, self-hosted install). |
+| `CLAYFORM_ALLOW_PRIVATE_WEBHOOKS` | — | Set to `1` to let webhooks call private network addresses. Off by default so users can't reach your internal network. |
 | `DATABASE_URL` | — | Postgres connection string. When set (also read from `POSTGRES_URL`), Clayform uses Postgres instead of SQLite. Required on Vercel. |
 | `CLAYFORM_DATA_DIR` | `./data` | Where `clayform.db` and `uploads/` live (SQLite only). |
 | `NEXT_PUBLIC_SITE_URL` | request origin | Public URL used in share links and embed code. |
@@ -174,7 +176,7 @@ npm run build
 
 ## Roadmap
 
-Ideas we'd love help with: multiple users and workspaces, email notifications, payment questions (Stripe), signature and address questions, translations, A/B testing of question wording, a visual logic map, Google Sheets sync.
+Ideas we'd love help with: teams and shared workspaces, password reset by email, email notifications, payment questions (Stripe), signature and address questions, translations, A/B testing of question wording, a visual logic map, Google Sheets sync.
 
 ## Contributing
 

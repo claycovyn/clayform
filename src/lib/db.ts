@@ -10,6 +10,16 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Sql } from "postgres";
 import type { Form, FormStats, ResponseRecord } from "./types";
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  passwordHash: string;
+  /** Changing the password signs out every other session. */
+  passwordChangedAt: string;
+  createdAt: string;
+}
+
 export interface StoredFile {
   id: string;
   formId: string;
@@ -19,11 +29,20 @@ export interface StoredFile {
 }
 
 interface Store {
-  listForms(): Promise<(Form & { stats: FormStats })[]>;
+  createUser(user: User): Promise<boolean>;
+  getUser(id: string): Promise<User | null>;
+  getUserByEmail(email: string): Promise<User | null>;
+  updateUser(id: string, patch: Partial<Pick<User, "name" | "passwordHash" | "passwordChangedAt">>): Promise<void>;
+  deleteUser(id: string): Promise<void>;
+  /** Forms made before accounts existed go to the first person who signs up. */
+  claimOrphanForms(userId: string): Promise<void>;
+  listForms(ownerId: string): Promise<(Form & { stats: FormStats })[]>;
   getForm(id: string): Promise<Form | null>;
+  formOwner(id: string): Promise<string | null>;
   getFormBySlug(slug: string): Promise<Form | null>;
   slugTaken(slug: string, exceptId?: string): Promise<boolean>;
-  saveForm(form: Form): Promise<void>;
+  /** Inserts with the owner, or updates the document of an existing form (owner unchanged). */
+  saveForm(form: Form, ownerId: string): Promise<void>;
   deleteForm(id: string): Promise<void>;
   countView(formId: string): Promise<void>;
   formStats(formId: string): Promise<FormStats>;
@@ -51,6 +70,16 @@ const toStats = (r: Row | undefined): FormStats => ({
   starts: Number(r?.starts ?? 0),
   completes: Number(r?.completes ?? 0),
 });
+// Postgres returns Date objects; String(date) would drop the milliseconds.
+const iso = (v: unknown): string => (v instanceof Date ? v : new Date(String(v))).toISOString();
+const toUser = (r: Row): User => ({
+  id: String(r.id),
+  email: String(r.email),
+  name: String(r.name),
+  passwordHash: String(r.password_hash),
+  passwordChangedAt: iso(r.password_changed_at),
+  createdAt: iso(r.created_at),
+});
 const toFile = (r: Row): StoredFile => ({
   id: String(r.id),
   formId: String(r.form_id),
@@ -77,6 +106,10 @@ function sqliteStore(): Store {
     handle.exec(`
       PRAGMA journal_mode = WAL;
       PRAGMA foreign_keys = ON;
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password_hash TEXT NOT NULL,
+        password_changed_at TEXT NOT NULL, created_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS forms (
         id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, doc TEXT NOT NULL,
         views INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -91,7 +124,17 @@ function sqliteStore(): Store {
         name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL
       );
     `);
+    // Installs from before accounts existed: add the owner column.
+    const cols = handle.prepare("PRAGMA table_info(forms)").all() as Row[];
+    if (!cols.some((c) => c.name === "owner_id")) {
+      handle.exec("ALTER TABLE forms ADD COLUMN owner_id TEXT REFERENCES users(id) ON DELETE CASCADE");
+    }
+    handle.exec("CREATE INDEX IF NOT EXISTS forms_owner ON forms(owner_id, updated_at)");
     return handle;
+  };
+  const removeUploads = (where: string, arg: string) => {
+    const files = db().prepare(`SELECT id FROM files WHERE ${where}`).all(arg) as Row[];
+    for (const f of files) fs.rmSync(path.join(uploadDir, String(f.id)), { force: true });
   };
   const statsSql = `SELECT f.views,
       (SELECT COUNT(*) FROM responses r WHERE r.form_id = f.id) AS starts,
@@ -99,13 +142,51 @@ function sqliteStore(): Store {
     FROM forms f`;
 
   return {
-    async listForms() {
-      const rows = db().prepare(`${statsSql.replace("SELECT f.views", "SELECT f.doc, f.views")} ORDER BY f.updated_at DESC`).all() as Row[];
+    async createUser(u) {
+      try {
+        db()
+          .prepare("INSERT INTO users (id, email, name, password_hash, password_changed_at, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+          .run(u.id, u.email, u.name, u.passwordHash, u.passwordChangedAt, u.createdAt);
+        return true;
+      } catch (e) {
+        if (String((e as Error).message).includes("UNIQUE")) return false;
+        throw e;
+      }
+    },
+    async getUser(id) {
+      const r = db().prepare("SELECT * FROM users WHERE id = ?").get(id) as Row | undefined;
+      return r ? toUser(r) : null;
+    },
+    async getUserByEmail(email) {
+      const r = db().prepare("SELECT * FROM users WHERE email = ?").get(email) as Row | undefined;
+      return r ? toUser(r) : null;
+    },
+    async updateUser(id, patch) {
+      const u = (await this.getUser(id))!;
+      db()
+        .prepare("UPDATE users SET name = ?, password_hash = ?, password_changed_at = ? WHERE id = ?")
+        .run(patch.name ?? u.name, patch.passwordHash ?? u.passwordHash, patch.passwordChangedAt ?? u.passwordChangedAt, id);
+    },
+    async deleteUser(id) {
+      removeUploads("form_id IN (SELECT id FROM forms WHERE owner_id = ?)", id);
+      db().prepare("DELETE FROM users WHERE id = ?").run(id);
+    },
+    async claimOrphanForms(userId) {
+      db().prepare("UPDATE forms SET owner_id = ? WHERE owner_id IS NULL").run(userId);
+    },
+    async listForms(ownerId) {
+      const rows = db()
+        .prepare(`${statsSql.replace("SELECT f.views", "SELECT f.doc, f.views")} WHERE f.owner_id = ? ORDER BY f.updated_at DESC`)
+        .all(ownerId) as Row[];
       return rows.map((r) => ({ ...doc<Form>(r.doc), stats: toStats(r) }));
     },
     async getForm(id) {
       const r = db().prepare("SELECT doc FROM forms WHERE id = ?").get(id) as Row | undefined;
       return r ? doc<Form>(r.doc) : null;
+    },
+    async formOwner(id) {
+      const r = db().prepare("SELECT owner_id FROM forms WHERE id = ?").get(id) as Row | undefined;
+      return r?.owner_id ? String(r.owner_id) : null;
     },
     async getFormBySlug(slug) {
       const r = db().prepare("SELECT doc FROM forms WHERE slug = ?").get(slug) as Row | undefined;
@@ -115,17 +196,16 @@ function sqliteStore(): Store {
       const r = db().prepare("SELECT id FROM forms WHERE slug = ?").get(slug) as Row | undefined;
       return !!r && r.id !== exceptId;
     },
-    async saveForm(form) {
+    async saveForm(form, ownerId) {
       db()
         .prepare(
-          `INSERT INTO forms (id, slug, doc, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+          `INSERT INTO forms (id, slug, doc, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, doc = excluded.doc, updated_at = excluded.updated_at`,
         )
-        .run(form.id, form.slug, JSON.stringify(form), form.createdAt, form.updatedAt);
+        .run(form.id, form.slug, JSON.stringify(form), ownerId, form.createdAt, form.updatedAt);
     },
     async deleteForm(id) {
-      const files = db().prepare("SELECT id FROM files WHERE form_id = ?").all(id) as Row[];
-      for (const f of files) fs.rmSync(path.join(uploadDir, String(f.id)), { force: true });
+      removeUploads("form_id = ?", id);
       db().prepare("DELETE FROM forms WHERE id = ?").run(id);
     },
     async countView(formId) {
@@ -185,7 +265,11 @@ function postgresStore(url: string): Store {
     }
     ready ??= client
       .unsafe(
-        `CREATE TABLE IF NOT EXISTS clayform_forms (
+        `CREATE TABLE IF NOT EXISTS clayform_users (
+          id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password_hash TEXT NOT NULL,
+          password_changed_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS clayform_forms (
           id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, doc JSONB NOT NULL,
           views INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL, updated_at TIMESTAMPTZ NOT NULL
         );
@@ -198,7 +282,9 @@ function postgresStore(url: string): Store {
           id TEXT PRIMARY KEY, form_id TEXT NOT NULL REFERENCES clayform_forms(id) ON DELETE CASCADE,
           name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, data BYTEA NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        );`,
+        );
+        ALTER TABLE clayform_forms ADD COLUMN IF NOT EXISTS owner_id TEXT REFERENCES clayform_users(id) ON DELETE CASCADE;
+        CREATE INDEX IF NOT EXISTS clayform_forms_owner ON clayform_forms(owner_id, updated_at);`,
       )
       .then(() => undefined)
       .catch((e) => {
@@ -215,10 +301,48 @@ function postgresStore(url: string): Store {
     (SELECT COUNT(*) FROM clayform_responses r WHERE r.form_id = f.id AND r.completed_at IS NOT NULL) AS completes`;
 
   return {
-    async listForms() {
+    async createUser(u) {
       const q = await sql();
-      const rows = await q`SELECT f.doc, ${stats(q)} FROM clayform_forms f ORDER BY f.updated_at DESC`;
+      const rows = await q`INSERT INTO clayform_users (id, email, name, password_hash, password_changed_at, created_at)
+        VALUES (${u.id}, ${u.email}, ${u.name}, ${u.passwordHash}, ${u.passwordChangedAt}, ${u.createdAt})
+        ON CONFLICT (email) DO NOTHING RETURNING id`;
+      return rows.length === 1;
+    },
+    async getUser(id) {
+      const q = await sql();
+      const [r] = await q`SELECT * FROM clayform_users WHERE id = ${id}`;
+      return r ? toUser(r) : null;
+    },
+    async getUserByEmail(email) {
+      const q = await sql();
+      const [r] = await q`SELECT * FROM clayform_users WHERE email = ${email}`;
+      return r ? toUser(r) : null;
+    },
+    async updateUser(id, patch) {
+      const q = await sql();
+      await q`UPDATE clayform_users SET
+        name = COALESCE(${patch.name ?? null}, name),
+        password_hash = COALESCE(${patch.passwordHash ?? null}, password_hash),
+        password_changed_at = COALESCE(${patch.passwordChangedAt ?? null}::timestamptz, password_changed_at)
+        WHERE id = ${id}`;
+    },
+    async deleteUser(id) {
+      const q = await sql();
+      await q`DELETE FROM clayform_users WHERE id = ${id}`;
+    },
+    async claimOrphanForms(userId) {
+      const q = await sql();
+      await q`UPDATE clayform_forms SET owner_id = ${userId} WHERE owner_id IS NULL`;
+    },
+    async listForms(ownerId) {
+      const q = await sql();
+      const rows = await q`SELECT f.doc, ${stats(q)} FROM clayform_forms f WHERE f.owner_id = ${ownerId} ORDER BY f.updated_at DESC`;
       return rows.map((r) => ({ ...doc<Form>(r.doc), stats: toStats(r) }));
+    },
+    async formOwner(id) {
+      const q = await sql();
+      const [r] = await q`SELECT owner_id FROM clayform_forms WHERE id = ${id}`;
+      return r?.owner_id ? String(r.owner_id) : null;
     },
     async getForm(id) {
       const q = await sql();
@@ -235,10 +359,10 @@ function postgresStore(url: string): Store {
       const [r] = await q`SELECT id FROM clayform_forms WHERE slug = ${slug}`;
       return !!r && r.id !== exceptId;
     },
-    async saveForm(form) {
+    async saveForm(form, ownerId) {
       const q = await sql();
-      await q`INSERT INTO clayform_forms (id, slug, doc, created_at, updated_at)
-        VALUES (${form.id}, ${form.slug}, ${q.json(JSON.parse(JSON.stringify(form)))}, ${form.createdAt}, ${form.updatedAt})
+      await q`INSERT INTO clayform_forms (id, slug, doc, owner_id, created_at, updated_at)
+        VALUES (${form.id}, ${form.slug}, ${q.json(JSON.parse(JSON.stringify(form)))}, ${ownerId}, ${form.createdAt}, ${form.updatedAt})
         ON CONFLICT (id) DO UPDATE SET slug = EXCLUDED.slug, doc = EXCLUDED.doc, updated_at = EXCLUDED.updated_at`;
     },
     async deleteForm(id) {
@@ -302,11 +426,23 @@ function s(): Store {
   return store;
 }
 
-export const listForms = () => s().listForms();
+export const createUser = (user: User) => s().createUser(user);
+export const getUser = (id: string) => s().getUser(id);
+export const getUserByEmail = (email: string) => s().getUserByEmail(email);
+export const updateUser = (id: string, patch: Parameters<Store["updateUser"]>[1]) => s().updateUser(id, patch);
+export const deleteUser = (id: string) => s().deleteUser(id);
+export const claimOrphanForms = (userId: string) => s().claimOrphanForms(userId);
+export const listForms = (ownerId: string) => s().listForms(ownerId);
 export const getForm = (id: string) => s().getForm(id);
+export const formOwner = (id: string) => s().formOwner(id);
+/** The form, but only if this user owns it. */
+export async function getOwnedForm(id: string, userId: string): Promise<Form | null> {
+  if ((await formOwner(id)) !== userId) return null;
+  return getForm(id);
+}
 export const getFormBySlug = (slug: string) => s().getFormBySlug(slug);
 export const slugTaken = (slug: string, exceptId?: string) => s().slugTaken(slug, exceptId);
-export const saveForm = (form: Form) => s().saveForm(form);
+export const saveForm = (form: Form, ownerId: string) => s().saveForm(form, ownerId);
 export const deleteForm = (id: string) => s().deleteForm(id);
 export const countView = (formId: string) => s().countView(formId);
 export const formStats = (formId: string) => s().formStats(formId);

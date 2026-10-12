@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The dashboard is open without a password in development. Data goes to `./data` (git-ignored); delete it to start fresh.
+Sign up at http://localhost:3000/signup to get an account. Data goes to `./data` (git-ignored); delete it to start fresh.
 
 ## Before you open a PR
 

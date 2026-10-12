@@ -9,6 +9,11 @@ Free, open-source, self-hosted conversational form builder (Next.js 15, React 19
 `src/lib/db.ts` has one async interface with two drivers: Postgres when `DATABASE_URL`/`POSTGRES_URL` is set
 (required on Vercel), otherwise SQLite via `node:sqlite` in `CLAYFORM_DATA_DIR`. Keep both drivers in step.
 
+## Accounts
+Email + password accounts (`src/lib/auth.ts`, scrypt; session cookie signed with `CLAYFORM_SECRET` and the
+user's `passwordChangedAt`). Every form has an `owner_id`; admin routes go through `requireOwnedForm`
+(`src/lib/api.ts`) and return 404 for forms you don't own. Webhook targets pass `src/lib/netguard.ts`.
+
 ## Hosting
 - GitHub: https://github.com/claycovyn/clayform (public, default branch `main`).
 - Vercel is on a **Hobby** team owned by `claycovyn`. Hobby only deploys a commit when every author and

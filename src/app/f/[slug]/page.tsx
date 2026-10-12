@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Player } from "@/components/player/Player";
-import { isAdmin } from "@/lib/auth";
-import { getFormBySlug } from "@/lib/db";
+import { currentUser } from "@/lib/auth";
+import { formOwner, getFormBySlug } from "@/lib/db";
 import { maxUploadMb } from "@/lib/limits";
 import { closedReason } from "@/lib/submit";
 
@@ -37,7 +37,7 @@ export default async function FormPage({ params, searchParams }: Props) {
   }
 
   // Unpublished forms can be previewed by the owner but not answered.
-  const draftPreview = form.status !== "published" && (await isAdmin());
+  const draftPreview = form.status !== "published" && (await currentUser())?.id === (await formOwner(form.id));
   const closed = draftPreview ? null : await closedReason(form);
 
   return (

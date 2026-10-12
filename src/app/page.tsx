@@ -56,8 +56,11 @@ export default function Home() {
           <a href={REPO} className="btn-ghost hidden sm:inline-flex">
             GitHub
           </a>
-          <Link href="/forms" className="btn-primary">
-            Open dashboard
+          <Link href="/login" className="btn-ghost">
+            Log in
+          </Link>
+          <Link href="/signup" className="btn-primary">
+            Sign up free
           </Link>
         </nav>
       </header>
@@ -76,8 +79,8 @@ export default function Home() {
               response caps, no paywalled features and no monthly bill.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/forms" className="btn-brand px-6 py-3 text-base">
-                Build a form →
+              <Link href="/signup" className="btn-brand px-6 py-3 text-base">
+                Start free — no card →
               </Link>
               <a href={REPO} className="btn-outline px-6 py-3 text-base">
                 ★ Star on GitHub
@@ -132,10 +135,10 @@ export default function Home() {
           <div className="mx-auto flex max-w-6xl flex-col items-center px-4 py-20 text-center">
             <LogoMark size={64} spin />
             <h2 className="mt-6 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Your forms. Your data. $0.</h2>
-            <p className="mt-4 max-w-xl text-paper/70">Run it on a $5 server, a Raspberry Pi or your laptop. One command with Docker. Contributions welcome.</p>
+            <p className="mt-4 max-w-xl text-paper/70">Sign up and start building in seconds — or run your own copy on a $5 server with one Docker command. It&apos;s open source either way.</p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link href="/forms" className="btn-brand px-6 py-3 text-base">
-                Start building
+              <Link href="/signup" className="btn-brand px-6 py-3 text-base">
+                Create your free account
               </Link>
               <a href={REPO} className="btn px-6 py-3 text-base text-paper ring-1 ring-paper/30 hover:bg-paper/10">
                 Read the docs

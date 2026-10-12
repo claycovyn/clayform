@@ -1,6 +1,6 @@
-import { requireAdmin } from "@/lib/api";
+import { requireOwnedForm } from "@/lib/api";
 import { responsesToCsv } from "@/lib/csv";
-import { getForm, listResponses } from "@/lib/db";
+import { listResponses } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -8,10 +8,8 @@ type Params = { params: Promise<{ id: string }> };
 
 /** ?format=csv|json&status=all|complete|partial  — or ?format=form for the form definition. */
 export async function GET(req: Request, { params }: Params) {
-  const denied = await requireAdmin();
+  const { form, denied } = await requireOwnedForm((await params).id);
   if (denied) return denied;
-  const form = await getForm((await params).id);
-  if (!form) return new Response("Not found", { status: 404 });
   const url = new URL(req.url);
   const format = url.searchParams.get("format") ?? "csv";
   const status = url.searchParams.get("status") ?? "all";

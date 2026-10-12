@@ -5,6 +5,7 @@ import { computeScore, fieldByRef, isEmpty, isQuestion, resolvePath, validateAns
 import { formStats, getFile, getResponse, saveResponse } from "./db";
 import { hash } from "./auth";
 import { uid } from "./fields";
+import { webhookBlocked } from "./netguard";
 import type { AnswerValue, Answers, Form, ResponseRecord } from "./types";
 
 export interface SubmitBody {
@@ -162,13 +163,19 @@ export function webhookPayload(form: Form, response: ResponseRecord) {
 export async function deliverWebhook(form: Form, response: ResponseRecord): Promise<{ ok: boolean; status?: number; error?: string }> {
   const url = form.settings.webhookUrl;
   if (!url) return { ok: true };
+  const blocked = await webhookBlocked(url);
+  if (blocked) {
+    console.warn(`[clayform] webhook to ${url} refused: ${blocked}`);
+    return { ok: false, error: blocked };
+  }
   const body = JSON.stringify(webhookPayload(form, response));
   const headers: Record<string, string> = { "content-type": "application/json", "user-agent": "Clayform-Webhook/1" };
   if (form.settings.webhookSecret)
     headers["x-clayform-signature"] =
       "sha256=" + crypto.createHmac("sha256", form.settings.webhookSecret).update(body).digest("hex");
   try {
-    const res = await fetch(url, { method: "POST", headers, body, signal: AbortSignal.timeout(5000) });
+    // No redirects: a public URL could otherwise bounce the request to a private one.
+    const res = await fetch(url, { method: "POST", headers, body, redirect: "manual", signal: AbortSignal.timeout(5000) });
     return { ok: res.ok, status: res.status };
   } catch (e) {
     console.warn(`[clayform] webhook to ${url} failed:`, (e as Error).message);

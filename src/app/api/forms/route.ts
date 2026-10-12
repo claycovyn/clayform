@@ -1,4 +1,4 @@
-import { json, readJson, requireAdmin } from "@/lib/api";
+import { json, readJson, requireUser } from "@/lib/api";
 import { listForms, saveForm, slugTaken } from "@/lib/db";
 import { uid } from "@/lib/fields";
 import { parseForm } from "@/lib/schema";
@@ -7,14 +7,14 @@ import { TEMPLATES } from "@/lib/templates";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const denied = await requireAdmin();
+  const { user, denied } = await requireUser();
   if (denied) return denied;
-  return json({ forms: await listForms() });
+  return json({ forms: await listForms(user.id) });
 }
 
 /** Create from a template ({ template }) or import a form JSON ({ form }). */
 export async function POST(req: Request) {
-  const denied = await requireAdmin();
+  const { user, denied } = await requireUser();
   if (denied) return denied;
   const body = await readJson<{ template?: string; form?: unknown; copy?: boolean }>(req, 5_000_000);
   if (!body) return json({ error: "Bad request." }, 400);
@@ -35,6 +35,6 @@ export async function POST(req: Request) {
   const now = new Date().toISOString();
   form.createdAt = now;
   form.updatedAt = now;
-  await saveForm(form);
+  await saveForm(form, user.id);
   return json({ form }, 201);
 }

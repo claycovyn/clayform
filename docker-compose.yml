@@ -4,8 +4,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      CLAYFORM_PASSWORD: ${CLAYFORM_PASSWORD:?Set CLAYFORM_PASSWORD}
-      CLAYFORM_SECRET: ${CLAYFORM_SECRET:-}
+      CLAYFORM_SECRET: ${CLAYFORM_SECRET:?Set CLAYFORM_SECRET (openssl rand -hex 32)}
+      CLAYFORM_SIGNUPS: ${CLAYFORM_SIGNUPS:-open}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
     volumes:
       - clayform-data:/data

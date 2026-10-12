@@ -7,7 +7,15 @@ import type { Form, FormStats } from "@/lib/types";
 
 type Listed = Form & { stats: FormStats };
 
-export function Dashboard({ forms: initial, templates, openDev }: { forms: Listed[]; templates: { id: string; name: string; blurb: string }[]; openDev: boolean }) {
+export function Dashboard({
+  forms: initial,
+  templates,
+  user,
+}: {
+  forms: Listed[];
+  templates: { id: string; name: string; blurb: string }[];
+  user: { name: string; email: string };
+}) {
   const [forms, setForms] = useState(initial);
   const [picking, setPicking] = useState(initial.length === 0);
   const [error, setError] = useState("");
@@ -62,28 +70,19 @@ export function Dashboard({ forms: initial, templates, openDev }: { forms: Liste
             <button type="button" className="btn-brand" onClick={() => setPicking(true)}>
               + New<span className="hidden sm:inline"> form</span>
             </button>
-            {!openDev && (
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={async () => {
-                  await fetch("/api/logout", { method: "POST" });
-                  window.location.href = "/login";
-                }}
-              >
-                Sign out
-              </button>
-            )}
+            <Link
+              href="/account"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-bold text-white hover:bg-black"
+              title={`${user.name} · ${user.email}`}
+              aria-label="Your account"
+            >
+              {user.name.trim().charAt(0).toUpperCase() || "?"}
+            </Link>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        {openDev && (
-          <p className="mb-6 rounded-xl border border-brand/30 bg-brand-light/30 p-3 text-sm">
-            Dev mode: the dashboard is open because <code>CLAYFORM_PASSWORD</code> isn&apos;t set. Set it before you put this online.
-          </p>
-        )}
         {error && (
           <p className="mb-6 rounded-xl bg-red-50 p-3 text-sm text-red-700" role="alert">
             {error}
