@@ -2,6 +2,14 @@
 
 Thanks for helping make forms free.
 
+## License and the CLA
+
+Clayform is licensed under the [AGPL-3.0](LICENSE) (see [docs/LICENSING.md](docs/LICENSING.md)). Before your first
+pull request is merged, agree to the [Contributor License Agreement](docs/CLA.md) by adding this line to the PR
+description:
+
+> I have read the Clayform CLA (docs/CLA.md) and agree to it for this and future contributions.
+
 ## Setup
 
 ```bash

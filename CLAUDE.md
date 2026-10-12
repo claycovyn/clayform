@@ -34,6 +34,10 @@ user's `passwordChangedAt`). Every form has an `owner_id`; admin routes go throu
   co-author resolves to that account, so commits use `283821699+claycovyn@users.noreply.github.com` and carry
   **no `Co-Authored-By:` trailer**.
 
+## License
+AGPL-3.0-only from 2026-10-12 (MIT up to `f4113ac`). `src/lib/mcp-kit/` stays MIT. See `docs/LICENSING.md`; outside PRs
+need the CLA line (`docs/CLA.md`). Check new dependencies' licenses for AGPL compatibility.
+
 ## Rules
 - Logic lives in `src/lib/engine.ts` and stays pure: the browser and the server both run it.
 - The server re-validates everything a respondent sends (`src/lib/submit.ts`).

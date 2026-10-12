@@ -4,7 +4,8 @@ import { Player } from "@/components/player/Player";
 import { blankForm, choice, newField, THEME_PRESETS, uid } from "@/lib/fields";
 import type { Form } from "@/lib/types";
 
-const REPO = "https://github.com/claycovyn/clayform";
+// Where this install's source lives. Self-hosters running a modified copy set CLAYFORM_SOURCE_URL (AGPL section 13).
+const REPO = process.env.CLAYFORM_SOURCE_URL || "https://github.com/claycovyn/clayform";
 
 function demoForm(): Form {
   const form = blankForm("Try it — this is a real Clayform");
@@ -69,7 +70,7 @@ export default function Home() {
         <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-8 lg:grid-cols-[1.05fr_1fr] lg:pt-16">
           <div className="min-w-0">
             <p className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand-dark">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand" /> Free forever · MIT licensed · Self-hosted
+              <span className="h-1.5 w-1.5 rounded-full bg-brand" /> Free forever · Open source · Self-hosted
             </p>
             <h1 className="mt-5 font-display text-[2.75rem] sm:text-5xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
               Forms people <span className="text-brand">actually finish.</span>
@@ -150,7 +151,7 @@ export default function Home() {
 
       <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-ink-soft">
         <Logo size={22} />
-        <p>Open source under the MIT license. Not affiliated with any other form company.</p>
+        <p>Open source under the <a className="underline underline-offset-2" href={`${REPO}/blob/main/LICENSE`}>AGPL-3.0</a>. Not affiliated with any other form company.</p>
       </footer>
     </div>
   );
