@@ -218,7 +218,7 @@ PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Copyright © 2026 claycovyn. Clayform is free software under the [GNU Affero General Public License v3.0](LICENSE)
+Copyright © 2026 Clayton Sinclair. Clayform is free software under the [GNU Affero General Public License v3.0](LICENSE)
 (AGPL-3.0-only): use it, self-host it and change it for free. If you run a **modified** Clayform for other people over a
 network, you must offer them your changes' source code too. Versions released before this change stay available under
 MIT. The vendored OPENCTRL MCP kit in `src/lib/mcp-kit/` is MIT. Details: [docs/LICENSING.md](docs/LICENSING.md);

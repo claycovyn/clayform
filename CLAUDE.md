@@ -35,7 +35,7 @@ user's `passwordChangedAt`). Every form has an `owner_id`; admin routes go throu
   **no `Co-Authored-By:` trailer**.
 
 ## License
-AGPL-3.0-only from 2026-10-12 (MIT up to `f4113ac`). `src/lib/mcp-kit/` stays MIT. See `docs/LICENSING.md`; outside PRs
+AGPL-3.0-only from 2026-10-12, counsel-approved; copyright Clayton Sinclair (MIT up to `f4113ac`). `src/lib/mcp-kit/` stays MIT. See `docs/LICENSING.md`; outside PRs
 need the CLA line (`docs/CLA.md`). Check new dependencies' licenses for AGPL compatibility.
 
 ## Rules

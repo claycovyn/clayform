@@ -1,10 +1,10 @@
 # Licensing
 
-**Decision (2026-10-12, by the sole copyright holder):** Clayform is licensed under the
+**Decision (2026-10-12, by the sole copyright holder; approved by counsel):** Clayform is licensed under the
 **GNU Affero General Public License v3.0 only** (`AGPL-3.0-only`) from this change on.
 
-> Draft for counsel review. This page explains the decision in plain words; it isn't legal advice, and the
-> [LICENSE](../LICENSE) file is what counts.
+> This page explains the decision in plain words; it isn't legal advice, and the [LICENSE](../LICENSE) file is what
+> counts.
 
 ## Why AGPL-3.0
 
@@ -49,4 +49,4 @@ its license (for example to offer a commercial license to companies that can't u
 
 ## Copyright holder
 
-claycovyn (sole author of every commit to date). Replace with your legal name or company before counsel sign-off.
+Clayton Sinclair (GitHub: claycovyn), sole author of every commit to date.

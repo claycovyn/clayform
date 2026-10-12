@@ -1,8 +1,6 @@
-# Clayform Contributor License Agreement (draft)
+# Clayform Contributor License Agreement
 
-> **Draft for counsel review.** Until counsel approves this text, outside pull requests aren't merged.
-
-Thank you for contributing to Clayform ("the Project"), maintained by claycovyn ("the Maintainer").
+Thank you for contributing to Clayform ("the Project"), maintained by Clayton Sinclair ("the Maintainer").
 
 By submitting a contribution (code, documentation or other material) to the Project, you agree:
 
