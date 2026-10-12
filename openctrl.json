@@ -6,7 +6,7 @@
   "category": "forms-surveys",
   "website": "https://clayform.vercel.app",
   "repository": "https://github.com/claycovyn/clayform",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "icon": "https://clayform.vercel.app/icon-512.png",
   "pricing": { "model": "free", "notes": "Free on clayform.vercel.app and free to self-host. No response limits." },
   "savings_pct": null,

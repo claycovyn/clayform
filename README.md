@@ -18,7 +18,7 @@ One-question-at-a-time forms get more people to the end. The tools that made the
 
 | What reviewers complain about | What Clayform does |
 | --- | --- |
-| Prices go up fast once you need more responses | **$0.** MIT licensed. Run it on a $5 server, a Raspberry Pi or your laptop. |
+| Prices go up fast once you need more responses | **$0.** Open source (AGPL-3.0). Run it on a $5 server, a Raspberry Pi or your laptop. |
 | Small monthly response caps that stop a form mid-campaign | **No caps.** Your server, your SQLite file. Set a limit only if *you* want one. |
 | Useful features (logic, branding removal, partial responses) locked to higher tiers | **Everything unlocked**: logic, scoring, hidden fields, file uploads, webhooks, custom endings, no badge. |
 | Thin reporting | **Drop-off per question**, NPS calculated, completion rate, average time, endings reached. |
@@ -218,4 +218,10 @@ PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE). Clayform is an independent project, written from scratch. It is not affiliated with, endorsed by or derived from the code of any other form product. Product names mentioned anywhere belong to their owners.
+Copyright © 2026 Clayton Sinclair. Clayform is free software under the [GNU Affero General Public License v3.0](LICENSE)
+(AGPL-3.0-only): use it, self-host it and change it for free. If you run a **modified** Clayform for other people over a
+network, you must offer them your changes' source code too. Versions released before this change stay available under
+MIT. The vendored OPENCTRL MCP kit in `src/lib/mcp-kit/` is MIT. Details: [docs/LICENSING.md](docs/LICENSING.md);
+self-hosting guide: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
+
+Clayform is an independent project, written from scratch. It is not affiliated with, endorsed by or derived from the code of any other form product. Product names mentioned anywhere belong to their owners.
