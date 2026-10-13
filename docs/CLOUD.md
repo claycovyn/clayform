@@ -12,6 +12,7 @@ This is for the hosted service (clayform.vercel.app). **Self-hosters don't need 
 | `CLAYFORM_ADMIN_EMAILS` | Comma-separated emails that can open `/admin` (signed in with a browser session) |
 | `CLAYFORM_SUPPORT_EMAIL` | Shown to owners whose form was taken down, so they can appeal |
 | `OPENCTRL_CLIENT_ID`, `OPENCTRL_CLIENT_SECRET` | Turn on **Continue with OpenCtrl** on the log-in and sign-up pages. Create them on OpenCtrl's admin page for Clayform (Sign in with OpenCtrl), with the redirect URI `https://<this site>/api/auth/openctrl/callback`. `OPENCTRL_ISSUER` overrides https://openctrl.app |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Turn on **Continue with Google** under Continue with OpenCtrl. Google Cloud → APIs & Services → Credentials → OAuth client (Web application), authorized redirect URI `https://<this site>/api/auth/google/callback` |
 
 ## Plans and limits (`src/lib/plans.ts`, limits from `openctrl.json`)
 

@@ -104,6 +104,8 @@ On Vercel, file uploads are capped at 4 MB (Vercel's request-size limit). Files 
 | `CLAYFORM_DATA_DIR` | `./data` | Where `clayform.db` and `uploads/` live (SQLite only). |
 | `NEXT_PUBLIC_SITE_URL` | request origin | Public URL used in share links and embed code. |
 | `CLAYFORM_MAX_UPLOAD_MB` | `10` (`4` on Vercel) | Max size for file-upload answers. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | — | Turn on **Continue with Google**. Register `https://<your site>/api/auth/google/callback` as the redirect URI on the Google OAuth client. |
+| `OPENCTRL_CLIENT_ID`, `OPENCTRL_CLIENT_SECRET` | — | Turn on **Continue with OpenCtrl**. Redirect URI: `https://<your site>/api/auth/openctrl/callback`. |
 
 ## Embedding
 

@@ -24,7 +24,13 @@ export interface User {
   emailVerifiedAt?: string | null;
   /** The OpenCtrl account (OIDC `sub`) this account signs in with, once linked. */
   openctrlSub?: string | null;
+  /** The Google account (OIDC `sub`) this account signs in with, once linked. */
+  googleSub?: string | null;
 }
+
+/** Sign-in providers an account can be linked to, each by its own unique column. */
+export type SubProvider = "openctrl" | "google";
+const SUB_COLUMN: Record<SubProvider, "openctrl_sub" | "google_sub"> = { openctrl: "openctrl_sub", google: "google_sub" };
 
 /** One metered quantity for one workspace on one UTC day. */
 export interface UsageRow {
@@ -141,9 +147,9 @@ interface Store {
   /** Stored bytes for one workspace: form and response documents plus uploads. */
   storageBytes(userId: string): Promise<number>;
   setEmailVerified(id: string, at: string): Promise<void>;
-  getUserByOpenctrlSub(sub: string): Promise<User | null>;
-  /** Links an OpenCtrl account; false if that OpenCtrl account is already linked to someone else. */
-  linkOpenctrl(id: string, sub: string): Promise<boolean>;
+  getUserByProviderSub(provider: SubProvider, sub: string): Promise<User | null>;
+  /** Links a provider account; false if that provider account is already linked to someone else. */
+  linkProvider(provider: SubProvider, id: string, sub: string): Promise<boolean>;
   /** Published forms with their owner, for abuse scans. */
   publishedForms(): Promise<{ form: Form; ownerId: string | null }[]>;
   /** Releases the connection; the next call reopens it. */
@@ -177,6 +183,7 @@ const toUser = (r: Row): User => ({
   plan: r.plan ? String(r.plan) : "grandfathered",
   emailVerifiedAt: r.email_verified_at ? iso(r.email_verified_at) : null,
   openctrlSub: r.openctrl_sub ? String(r.openctrl_sub) : null,
+  googleSub: r.google_sub ? String(r.google_sub) : null,
 });
 const toReport = (r: Row): AbuseReport => ({
   id: String(r.id),
@@ -287,6 +294,8 @@ function sqliteStore(): Store {
     if (!userCols.some((c) => c.name === "email_verified_at")) handle.exec("ALTER TABLE users ADD COLUMN email_verified_at TEXT");
     if (!userCols.some((c) => c.name === "openctrl_sub")) handle.exec("ALTER TABLE users ADD COLUMN openctrl_sub TEXT");
     handle.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_openctrl_sub ON users(openctrl_sub)");
+    if (!userCols.some((c) => c.name === "google_sub")) handle.exec("ALTER TABLE users ADD COLUMN google_sub TEXT");
+    handle.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)");
     // Installs from before accounts existed: add the owner column.
     const cols = handle.prepare("PRAGMA table_info(forms)").all() as Row[];
     if (!cols.some((c) => c.name === "owner_id")) {
@@ -520,13 +529,14 @@ function sqliteStore(): Store {
     async setEmailVerified(id, at) {
       db().prepare("UPDATE users SET email_verified_at = ? WHERE id = ?").run(at, id);
     },
-    async getUserByOpenctrlSub(sub) {
-      const r = db().prepare("SELECT * FROM users WHERE openctrl_sub = ?").get(sub) as Row | undefined;
+    async getUserByProviderSub(provider, sub) {
+      // The column comes from SUB_COLUMN, never from input.
+      const r = db().prepare(`SELECT * FROM users WHERE ${SUB_COLUMN[provider]} = ?`).get(sub) as Row | undefined;
       return r ? toUser(r) : null;
     },
-    async linkOpenctrl(id, sub) {
+    async linkProvider(provider, id, sub) {
       try {
-        db().prepare("UPDATE users SET openctrl_sub = ? WHERE id = ?").run(sub, id);
+        db().prepare(`UPDATE users SET ${SUB_COLUMN[provider]} = ? WHERE id = ?`).run(sub, id);
         return true;
       } catch (e) {
         if (String((e as Error).message).includes("UNIQUE")) return false;
@@ -589,6 +599,8 @@ function postgresStore(url: string): Store {
         ALTER TABLE clayform_users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
         ALTER TABLE clayform_users ADD COLUMN IF NOT EXISTS openctrl_sub TEXT;
         CREATE UNIQUE INDEX IF NOT EXISTS clayform_users_openctrl_sub ON clayform_users(openctrl_sub);
+        ALTER TABLE clayform_users ADD COLUMN IF NOT EXISTS google_sub TEXT;
+        CREATE UNIQUE INDEX IF NOT EXISTS clayform_users_google_sub ON clayform_users(google_sub);
         CREATE TABLE IF NOT EXISTS clayform_usage_daily (
           user_id TEXT NOT NULL REFERENCES clayform_users(id) ON DELETE CASCADE, day TEXT NOT NULL, metric TEXT NOT NULL,
           amount BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (user_id, day, metric)
@@ -843,15 +855,15 @@ function postgresStore(url: string): Store {
       const q = await sql();
       await q`UPDATE clayform_users SET email_verified_at = ${at} WHERE id = ${id}`;
     },
-    async getUserByOpenctrlSub(sub) {
+    async getUserByProviderSub(provider, sub) {
       const q = await sql();
-      const [r] = await q`SELECT * FROM clayform_users WHERE openctrl_sub = ${sub}`;
+      const [r] = await q`SELECT * FROM clayform_users WHERE ${q(SUB_COLUMN[provider])} = ${sub}`;
       return r ? toUser(r) : null;
     },
-    async linkOpenctrl(id, sub) {
+    async linkProvider(provider, id, sub) {
       const q = await sql();
       try {
-        await q`UPDATE clayform_users SET openctrl_sub = ${sub} WHERE id = ${id}`;
+        await q`UPDATE clayform_users SET ${q(SUB_COLUMN[provider])} = ${sub} WHERE id = ${id}`;
         return true;
       } catch (e) {
         if ((e as { code?: string }).code === "23505") return false;
@@ -928,5 +940,7 @@ export const setSetting = (key: string, value: string) => s().setSetting(key, va
 export const publishedForms = () => s().publishedForms();
 export const storageBytes = (userId: string) => s().storageBytes(userId);
 export const setEmailVerified = (id: string, at: string) => s().setEmailVerified(id, at);
-export const getUserByOpenctrlSub = (sub: string) => s().getUserByOpenctrlSub(sub);
-export const linkOpenctrl = (id: string, sub: string) => s().linkOpenctrl(id, sub);
+export const getUserByProviderSub = (provider: SubProvider, sub: string) => s().getUserByProviderSub(provider, sub);
+export const linkProvider = (provider: SubProvider, id: string, sub: string) => s().linkProvider(provider, id, sub);
+/** The provider account this user is linked to, if any. */
+export const providerSubOf = (user: User, provider: SubProvider) => (provider === "openctrl" ? user.openctrlSub : user.googleSub) ?? null;

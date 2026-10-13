@@ -13,11 +13,16 @@ Free, open-source, self-hosted conversational form builder (Next.js 15, React 19
 Email + password accounts (`src/lib/auth.ts`, scrypt; session cookie signed with `CLAYFORM_SECRET` and the
 user's `passwordChangedAt`). Every form has an `owner_id`; admin routes go through `requireOwnedForm`
 (`src/lib/api.ts`) and return 404 for forms you don't own. Webhook targets pass `src/lib/netguard.ts`.
-- **Continue with OpenCtrl** (OIDC, `src/lib/openctrlLogin.ts`, routes `/api/auth/openctrl/{start,callback}`): on only
-  when `OPENCTRL_CLIENT_ID` + `OPENCTRL_CLIENT_SECRET` are set (`OPENCTRL_ISSUER` defaults to https://openctrl.app).
-  Accounts link by `users.openctrl_sub`. An existing account is linked by email only when both sides verified it;
-  otherwise the person logs in with its password once (`api/login` finishes the link). Accounts made through OpenCtrl
-  have no usable password. Tests: `tests/openctrl-login.test.ts`.
+- **Continue with OpenCtrl / Google** (OIDC: code + PKCE + nonce, RS256 ID tokens). Generic client `src/lib/oidc.ts`,
+  provider settings `src/lib/oidcProviders.ts`, routes `/api/auth/<openctrl|google>/{start,callback}` via
+  `src/lib/oidcRoutes.ts`. OpenCtrl: on when `OPENCTRL_CLIENT_ID` + `OPENCTRL_CLIENT_SECRET` are set (`OPENCTRL_ISSUER`
+  defaults to https://openctrl.app). Google: on when `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` are set; redirect URI
+  `<site>/api/auth/google/callback`; issuer `https://accounts.google.com` or `accounts.google.com`; client_secret_post.
+  Accounts link by `users.openctrl_sub` / `users.google_sub` (unique, both drivers). An existing account is linked by
+  email only when both sides verified it; otherwise the person logs in with its password once (`api/login` finishes
+  the link). New Google accounts need a Google-verified email. Accounts made through a provider have no usable
+  password. Buttons: `src/components/dashboard/ProviderButtons.tsx` on log-in and sign-up, order and visibility in
+  `src/lib/signinProviders.ts` (OpenCtrl, Google, one "or with email" divider). Tests: `tests/oidc.test.ts`.
 
 ## API keys and MCP
 - `src/lib/apiKeys.ts`: keys are `cf_` + 32 random bytes; only the SHA-256 is stored; scopes `forms:read`,

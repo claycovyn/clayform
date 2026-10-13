@@ -25,6 +25,8 @@ Free forever. You need a server that can run Node.js, or Docker, or a Vercel acc
 | `CLAYFORM_MAX_UPLOAD_MB` | 10 (4 on Vercel) | Upload size cap |
 | `CLAYFORM_ALLOW_PRIVATE_WEBHOOKS` | off | `1` allows webhooks to private network addresses |
 | `CLAYFORM_SOURCE_URL` | the official repo | Your fork's address, if you've changed Clayform (see below) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | unset | **Continue with Google** on the log-in and sign-up pages (both needed). In Google Cloud, create an OAuth client (Web application) with the authorized redirect URI `https://<your site>/api/auth/google/callback` |
+| `OPENCTRL_CLIENT_ID`, `OPENCTRL_CLIENT_SECRET` | unset | **Continue with OpenCtrl** (both needed). Redirect URI `https://<your site>/api/auth/openctrl/callback`; `OPENCTRL_ISSUER` overrides https://openctrl.app |
 
 `CLAYFORM_CLOUD`, `CLAYFORM_ADMIN_EMAILS` and `CLAYFORM_SUPPORT_EMAIL` are for the hosted service
 ([docs/CLOUD.md](CLOUD.md)). Leave them unset: a self-hosted Clayform has no plans and no limits.
