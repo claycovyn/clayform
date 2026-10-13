@@ -55,3 +55,5 @@ need the CLA line (`docs/CLA.md`). Check new dependencies' licenses for AGPL com
 - The server re-validates everything a respondent sends (`src/lib/submit.ts`).
 - Every form field must be in `src/lib/schema.ts`.
 - Brand: cobalt `#2F5BFF`, ink `#0B0B12`, Inter Tight display, potter's-wheel mark (`src/components/Logo.tsx`).
+- No browser `confirm()` / `prompt()` / `alert()`: use `useConfirm()` / `usePrompt()` from `src/components/ui/Dialog.tsx`
+  (store in `src/lib/dialogs.ts`, tests in `tests/dialogs.test.ts`). The respondent Player keeps its own themed UI.

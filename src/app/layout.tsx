@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { GOOGLE_FONTS_HREF } from "@/lib/fields";
+import { DialogProvider } from "@/components/ui/Dialog";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,7 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="stylesheet" href={GOOGLE_FONTS_HREF} />
       </head>
-      <body className="min-h-screen font-sans antialiased">{children}</body>
+      <body className="min-h-screen font-sans antialiased">
+        <DialogProvider>{children}</DialogProvider>
+      </body>
     </html>
   );
 }

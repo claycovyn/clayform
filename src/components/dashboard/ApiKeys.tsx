@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/ui/Dialog";
 
 type Key = { id: string; name: string; prefix: string; scopes: string[]; createdAt: string; lastUsedAt: string | null; revokedAt: string | null };
 
@@ -28,6 +29,7 @@ export function ApiKeys({ scopes, defaults, mcpUrl }: { scopes: Record<string, s
   const [keys, setKeys] = useState<Key[] | null>(null);
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<string[]>(defaults);
+  const confirmDialog = useConfirm();
   const [fresh, setFresh] = useState<{ name: string; secret: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -158,7 +160,13 @@ export function ApiKeys({ scopes, defaults, mcpUrl }: { scopes: Record<string, s
                   type="button"
                   className="btn-outline text-red-600"
                   onClick={async () => {
-                    if (!confirm(`Revoke “${k.name}”? Anything using it stops working right away.`)) return;
+                    const ok = await confirmDialog({
+                      title: "Revoke API key",
+                      body: `Revoke “${k.name}”? Anything using it stops working right away. This can't be undone.`,
+                      confirmLabel: "Revoke key",
+                      tone: "danger",
+                    });
+                    if (!ok) return;
                     const res = await fetch(`/api/account/keys/${k.id}`, { method: "DELETE" });
                     if (!res.ok) setError("Couldn't revoke that key.");
                     void load();

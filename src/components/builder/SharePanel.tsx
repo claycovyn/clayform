@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { usePrompt } from "@/components/ui/Dialog";
 import type { Form } from "@/lib/types";
 import type { Update } from "./Builder";
 
 function Copy({ text, label = "Copy" }: { text: string; label?: string }) {
   const [done, setDone] = useState(false);
+  const promptDialog = usePrompt();
   return (
     <button
       type="button"
@@ -14,7 +16,16 @@ function Copy({ text, label = "Copy" }: { text: string; label?: string }) {
         try {
           await navigator.clipboard.writeText(text);
         } catch {
-          window.prompt("Copy:", text);
+          // Clipboard blocked (permissions, insecure origin): show the text selected so it can be copied by hand.
+          await promptDialog({
+            title: "Copy it yourself",
+            body: "Your browser blocked copying. The text is selected, so copy it from here.",
+            label: "Text to copy",
+            defaultValue: text,
+            readOnly: true,
+            multiline: text.includes("\n") || text.length > 80,
+          });
+          return;
         }
         setDone(true);
         setTimeout(() => setDone(false), 1800);

@@ -111,6 +111,10 @@ export function Player({ form, preview = false, contained = false, embedded = fa
   const [busy, setBusy] = useState(false);
   const [offline, setOffline] = useState(false);
   const [copied, setCopied] = useState(false);
+  /** Resume link shown in the form's own theme when the clipboard is blocked. */
+  const [manualLink, setManualLink] = useState<string | null>(null);
+  const manualLinkRef = useRef<HTMLInputElement>(null);
+  const finishLaterRef = useRef<HTMLButtonElement>(null);
   const [resumeData, setResumeData] = useState<{ creds: Creds; answers: Answers; lastRef?: string } | null>(null);
 
   const creds = useRef<Creds | null>(null);
@@ -361,9 +365,20 @@ export function Player({ form, preview = false, contained = false, embedded = fa
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      window.prompt("Copy this link to finish later:", url);
+      setManualLink(url);
     }
   }
+
+  function closeManualLink() {
+    setManualLink(null);
+    finishLaterRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!manualLink) return;
+    manualLinkRef.current?.focus();
+    manualLinkRef.current?.select();
+  }, [manualLink]);
 
   function submitClassic() {
     const errors: Record<string, string> = {};
@@ -670,6 +685,43 @@ export function Player({ form, preview = false, contained = false, embedded = fa
           className={`${contained ? "sticky" : "fixed"} bottom-0 left-0 right-0 flex items-center justify-between gap-3 p-3 sm:p-4`}
           style={{ background: classic ? "var(--cf-bg)" : undefined }}
         >
+          {manualLink && (
+            <div
+              role="group"
+              aria-labelledby="cf-resume-link-label"
+              className="absolute bottom-full left-3 right-3 mb-2 p-3 shadow-lg sm:left-4 sm:right-auto sm:w-[26rem]"
+              style={{
+                background: "var(--cf-bg)",
+                color: "var(--cf-text)",
+                border: "1px solid color-mix(in srgb, var(--cf-text) 18%, transparent)",
+                borderRadius: "var(--cf-radius)",
+              }}
+              onKeyDown={(e) => e.key === "Escape" && closeManualLink()}
+            >
+              <label id="cf-resume-link-label" htmlFor="cf-resume-link" className="block text-sm font-semibold">
+                Copy this link to finish later
+              </label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="cf-resume-link"
+                  ref={manualLinkRef}
+                  readOnly
+                  value={manualLink}
+                  onFocus={(e) => e.target.select()}
+                  className="min-w-0 flex-1 bg-transparent px-2 py-1.5 font-mono text-xs outline-none"
+                  style={{ border: "1px solid color-mix(in srgb, var(--cf-text) 25%, transparent)", borderRadius: "calc(var(--cf-radius) * 0.6)" }}
+                />
+                <button
+                  type="button"
+                  onClick={closeManualLink}
+                  className="shrink-0 px-3 py-1.5 text-sm font-semibold transition hover:brightness-110"
+                  style={{ background: "var(--cf-accent)", color: "var(--cf-btn-text)", borderRadius: "calc(var(--cf-radius) * 0.6)" }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-3 text-xs">
             {form.settings.branding && (
               <a
@@ -689,7 +741,7 @@ export function Player({ form, preview = false, contained = false, embedded = fa
               </a>
             )}
             {form.settings.allowResume && !preview && answeredCount > 0 && screen.kind === "field" && (
-              <button type="button" onClick={copyResumeLink} className="px-1 py-2 underline-offset-2 opacity-70 hover:underline hover:opacity-100">
+              <button ref={finishLaterRef} type="button" onClick={copyResumeLink} className="px-1 py-2 underline-offset-2 opacity-70 hover:underline hover:opacity-100">
                 {copied ? "Link copied ✓" : "Finish later"}
               </button>
             )}

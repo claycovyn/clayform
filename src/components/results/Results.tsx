@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { LogoMark } from "@/components/Logo";
+import { useConfirm } from "@/components/ui/Dialog";
 import { displayValue, isEmpty, isQuestion, npsScore, plainText, scaleRange } from "@/lib/engine";
 import type { Field, FileAnswer, Form, FormStats, ResponseRecord } from "@/lib/types";
 
@@ -178,6 +179,7 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
   const [filter, setFilter] = useState<"complete" | "partial" | "all">("complete");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const confirmDialog = useConfirm();
   const [open, setOpen] = useState<ResponseRecord | null>(null);
 
   const questions = form.fields.filter(isQuestion);
@@ -195,7 +197,15 @@ export function Results({ form, initial, stats }: { form: Form; initial: Respons
   }, [responses, filter, query]);
 
   async function remove(ids: string[]) {
-    if (!ids.length || !confirm(`Delete ${ids.length} response${ids.length > 1 ? "s" : ""}? This can't be undone.`)) return;
+    if (!ids.length) return;
+    const many = ids.length > 1;
+    const ok = await confirmDialog({
+      title: many ? `Delete ${ids.length} responses` : "Delete response",
+      body: `Delete ${many ? `${ids.length} responses` : "this response"} to “${form.title}”? This can't be undone.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
     const res = await fetch(`/api/forms/${form.id}/responses`, {
       method: "DELETE",
       headers: { "content-type": "application/json" },

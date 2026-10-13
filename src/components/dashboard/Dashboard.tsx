@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Logo, LogoMark } from "@/components/Logo";
+import { useConfirm } from "@/components/ui/Dialog";
 import type { Form, FormStats } from "@/lib/types";
 
 type Listed = Form & { stats: FormStats };
@@ -124,6 +125,7 @@ export function Dashboard({
   const [picking, setPicking] = useState(initial.length === 0);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const confirmDialog = useConfirm();
 
   async function create(body: unknown) {
     setError("");
@@ -134,7 +136,16 @@ export function Dashboard({
   }
 
   async function remove(form: Listed) {
-    if (!confirm(`Delete “${form.title}” and all ${form.stats.starts} of its responses? This can't be undone.`)) return;
+    const n = form.stats.starts;
+    const ok = await confirmDialog({
+      title: "Delete form",
+      body: n
+        ? `Delete “${form.title}” and its ${n} response${n === 1 ? "" : "s"}? This can't be undone.`
+        : `Delete “${form.title}”? It has no responses yet. This can't be undone.`,
+      confirmLabel: "Delete form",
+      tone: "danger",
+    });
+    if (!ok) return;
     const res = await fetch(`/api/forms/${form.id}`, { method: "DELETE" });
     if (res.ok) setForms((fs) => fs.filter((f) => f.id !== form.id));
   }
