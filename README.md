@@ -165,7 +165,7 @@ The same keys work on the JSON API (`/api/forms`, `/api/forms/:id`, `/api/forms/
 be revoked at any time. Key management itself (and account settings) only works signed in, never with a key.
 
 Clayform also publishes an [`openctrl.json`](openctrl.json) manifest (served at `/openctrl.json`) so
-[OPENCTRL](https://github.com/claycovyn/openctrl) can list it as "Works with AI" and show agents how to connect.
+[OpenCtrl](https://github.com/claycovyn/openctrl) can list it as "Works with AI" and show agents how to connect.
 
 Try it with the MCP Inspector: `npx @modelcontextprotocol/inspector`, transport “Streamable HTTP”, your URL, and the
 `Authorization` header.
@@ -189,7 +189,7 @@ src/
   lib/formOps.ts       validated single-step form edits (used by the MCP server)
   lib/apiKeys.ts       API keys and permissions
   lib/mcp/             the MCP server's tools and its HTTP handler
-  lib/mcp-kit/         shared OPENCTRL MCP kit (vendored; don't edit here)
+  lib/mcp-kit/         shared OpenCtrl MCP kit (vendored; don't edit here)
   components/player/   the form respondents see
   components/builder/  build, logic, design, settings, share
   components/results/  summary, responses, drop-off
@@ -221,7 +221,7 @@ PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 Copyright © 2026 Clayton Sinclair. Clayform is free software under the [GNU Affero General Public License v3.0](LICENSE)
 (AGPL-3.0-only): use it, self-host it and change it for free. If you run a **modified** Clayform for other people over a
 network, you must offer them your changes' source code too. Versions released before this change stay available under
-MIT. The vendored OPENCTRL MCP kit in `src/lib/mcp-kit/` is MIT. Details: [docs/LICENSING.md](docs/LICENSING.md);
+MIT. The vendored OpenCtrl MCP kit in `src/lib/mcp-kit/` is MIT. Details: [docs/LICENSING.md](docs/LICENSING.md);
 self-hosting guide: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 Clayform is an independent project, written from scratch. It is not affiliated with, endorsed by or derived from the code of any other form product. Product names mentioned anywhere belong to their owners.

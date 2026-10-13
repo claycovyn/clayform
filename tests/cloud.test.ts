@@ -216,7 +216,7 @@ describe("abuse prevention", () => {
 });
 
 describe("the $12 model: fair use, packs, storage, notices, verification", () => {
-  it("never pauses an OPENCTRL Cloud subscriber over fair use; packs raise the limit", async () => {
+  it("never pauses an OpenCtrl Cloud subscriber over fair use; packs raise the limit", async () => {
     process.env.CLAYFORM_CLOUD = "1";
     const u = await user("cloud");
     const form = await publishedForm(u.id);
@@ -271,7 +271,9 @@ describe("the $12 model: fair use, packs, storage, notices, verification", () =>
       await answer(form); // 100
       expect(sent).toHaveLength(2);
       expect(sent[1].subject).toMatch(/reached your responses limit/);
-      expect(sent[1].text).toMatch(/Join OPENCTRL Cloud for \$12\/month/);
+      // The subscription can't be bought yet (CLAYFORM_CLOUD_PLAN_LIVE unset): no price, a true "coming soon".
+      expect(sent[1].text).toMatch(/OpenCtrl Cloud is coming soon/);
+      expect(sent[1].text).not.toMatch(/\$12\/month/);
       expect(sent[1].text).toMatch(/Nothing has been deleted/);
       expect(sent[1].html).toMatch(/^<!DOCTYPE html>/);
       expect(sent[1].html).toContain("/forms");

@@ -17,7 +17,7 @@ export const ALL_SCOPES = Object.keys(SCOPES) as Scope[];
 /** Everything except deleting responses, which has to be asked for. */
 export const DEFAULT_SCOPES: Scope[] = ["forms:read", "forms:write", "responses:read", "webhooks:write"];
 
-/** Clayform keys: "cf_" + 32 random bytes (base64url), via the shared OPENCTRL kit. */
+/** Clayform keys: "cf_" + 32 random bytes (base64url), via the shared OpenCtrl kit. */
 export const KEY_FORMAT = apiKeyFormat("cf_");
 export const KEY_PREFIX = KEY_FORMAT.prefix;
 

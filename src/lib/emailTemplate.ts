@@ -152,7 +152,7 @@ ${body}
 </td></tr>
 <tr><td class="cf-pad" style="padding:24px 40px 0;">
 ${c.reason ? `<p class="cf-muted" style="margin:0 0 10px;font-family:${FONT};font-size:12px;line-height:18px;color:${MUTED};">${escapeHtml(c.reason)}</p>` : ""}
-<p class="cf-muted" style="margin:0;font-family:${FONT};font-size:12px;line-height:18px;color:${MUTED};">Clayform, an OPENCTRL Original &middot; <a href="${safeHref(site)}" target="_blank" class="cf-muted" style="color:${MUTED};text-decoration:underline;">Open Clayform</a> &middot; <a href="${safeHref(source)}" target="_blank" class="cf-muted" style="color:${MUTED};text-decoration:underline;">Source code</a></p>
+<p class="cf-muted" style="margin:0;font-family:${FONT};font-size:12px;line-height:18px;color:${MUTED};">Clayform, an OpenCtrl Original &middot; <a href="${safeHref(site)}" target="_blank" class="cf-muted" style="color:${MUTED};text-decoration:underline;">Open Clayform</a> &middot; <a href="${safeHref(source)}" target="_blank" class="cf-muted" style="color:${MUTED};text-decoration:underline;">Source code</a></p>
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->
@@ -166,7 +166,7 @@ ${c.reason ? `<p class="cf-muted" style="margin:0 0 10px;font-family:${FONT};fon
     ...c.blocks.map(blockText),
     "--",
     ...(c.reason ? [c.reason] : []),
-    `Clayform, an OPENCTRL Original\nOpen Clayform: ${site}\nSource code: ${source}`,
+    `Clayform, an OpenCtrl Original\nOpen Clayform: ${site}\nSource code: ${source}`,
   ].join("\n\n");
 
   return { subject: c.subject, html, text };

@@ -49,7 +49,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 id="ws" className="font-display text-3xl font-extrabold">Workspaces · {label}</h1>
-              <p className="text-sm text-ink-soft">Sorted by margin, lowest first. Cost is an estimate from the unit costs below. Revenue is the plan price set by hand until OPENCTRL billing (build plan 7.3); an OPENCTRL Cloud subscription ($12) covers every Original, so it isn't all Clayform&apos;s.</p>
+              <p className="text-sm text-ink-soft">Sorted by margin, lowest first. Cost is an estimate from the unit costs below. Revenue is the plan price set by hand until OpenCtrl billing (build plan 7.3); an OpenCtrl Cloud subscription ($12) covers every Original, so it isn't all Clayform&apos;s.</p>
             </div>
             <form className="flex items-center gap-2 text-sm">
               <label htmlFor="month" className="text-ink-soft">Month</label>

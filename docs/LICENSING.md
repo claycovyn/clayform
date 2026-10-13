@@ -8,7 +8,7 @@
 
 ## Why AGPL-3.0
 
-Clayform is an OPENCTRL Original: free to use and self-host, with OPENCTRL Cloud offering a hosted version as a paid
+Clayform is an OpenCtrl Original: free to use and self-host, with OpenCtrl Cloud offering a hosted version as a paid
 service. Under MIT, anyone could take Clayform, change it, and sell it as a hosted service without sharing those
 changes. The AGPL keeps Clayform free for everyone while asking one thing of people who run a **modified** version for
 others over a network: offer those users the modified source (section 13).

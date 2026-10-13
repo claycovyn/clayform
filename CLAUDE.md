@@ -24,21 +24,21 @@ user's `passwordChangedAt`). Every form has an `owner_id`; admin routes go throu
   annotations (`readOnly` / `destructive`) and a test in `tests/mcp.test.ts`. Reference: `docs/MCP.md`.
 - Routes: `/api/mcp` and `/api/mcp/mcp`. Uploaded files reach agents as 15-minute signed links (`src/lib/fileLinks.ts`).
 - The MCP plumbing (key format, `createOpenCtrlMcp`, `defineTool`, manifest schema) is `src/lib/mcp-kit/`, **vendored**
-  from `packages/mcp-kit` in the OPENCTRL repo. Don't edit it here; change it there and copy `src/*.ts` back.
-- `openctrl.json` (repo root, served at `/openctrl.json`) is the OPENCTRL manifest. `tests/mcp.test.ts` fails if its
+  from `packages/mcp-kit` in the OpenCtrl repo. Don't edit it here; change it there and copy `src/*.ts` back.
+- `openctrl.json` (repo root, served at `/openctrl.json`) is the OpenCtrl manifest. `tests/mcp.test.ts` fails if its
   tools or scopes drift from the code.
 
 ## Cloud (plans, metering, abuse) — build plan 7.1–7.2
 - Limits come from `openctrl.json` → `cloud` (meters, `free`, `fair_use`, `packs`) via the kit (`entitlementLimits`,
   `usageStatus`); `src/lib/plans.ts` maps `users.plan` (`free` / `cloud` / `grandfathered`; old `pro` = `cloud`) to a
   tier. **Limits only when `CLAYFORM_CLOUD=1`**; self-hosted installs are never limited.
-- Free tier at a limit: new respondents / uploads pause (never delete). OPENCTRL Cloud ($12, every Original): never
+- Free tier at a limit: new respondents / uploads pause (never delete). OpenCtrl Cloud ($12, every Original): never
   paused; over fair use → "add a pack". Notices at 80/100% once per meter per month (`checkUsageNotices`).
 - Email: `src/lib/email.ts` (Resend HTTP, no SDK). Verification before publishing: `src/lib/verify.ts`.
 - `meter()` never throws. The manifest "emails" meter counts emails sent *for* a workspace (none yet); system emails go
   to `emails_sent` for cost only.
 - Abuse: `src/lib/abuse.ts`, `/report/[slug]`, takedowns. Admin: `/admin` (`CLAYFORM_ADMIN_EMAILS`), plans and packs
-  set by hand until OPENCTRL billing. Pricing page: `/pricing`. Guide: `docs/CLOUD.md`. Tests: `tests/cloud.test.ts`.
+  set by hand until OpenCtrl billing. Pricing page: `/pricing`. Guide: `docs/CLOUD.md`. Tests: `tests/cloud.test.ts`.
 
 ## Hosting
 - GitHub: https://github.com/claycovyn/clayform (public, default branch `main`).

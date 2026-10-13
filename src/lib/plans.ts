@@ -1,9 +1,9 @@
-// OPENCTRL Cloud for Clayform: tiers, metering, limits and usage notices. The software is free; limits only exist on the
+// OpenCtrl Cloud for Clayform: tiers, metering, limits and usage notices. The software is free; limits only exist on the
 // hosted Cloud (CLAYFORM_CLOUD=1). Self-hosted installs meter usage for their own stats but are never limited.
 //
-// Limits come from this app's openctrl.json `cloud` section (Free tier, fair use, packs), via the OPENCTRL kit:
-// - Free tier: the entry point. At a limit, new activity pauses (never deletes); the prompt is to join OPENCTRL Cloud.
-// - OPENCTRL Cloud ($12/month, every Original): fair-use limits plus packs. Never paused for going over; prompted to
+// Limits come from this app's openctrl.json `cloud` section (Free tier, fair use, packs), via the OpenCtrl kit:
+// - Free tier: the entry point. At a limit, new activity pauses (never deletes); the prompt is to join OpenCtrl Cloud.
+// - OpenCtrl Cloud ($12/month, every Original): fair-use limits plus packs. Never paused for going over; prompted to
 //   add a pack instead.
 // - Grandfathered: accounts from before Cloud was switched on. No limits.
 import "server-only";
@@ -16,13 +16,20 @@ import { siteUrl } from "./site";
 
 export const cloudEnabled = () => process.env.CLAYFORM_CLOUD === "1";
 
+/**
+ * Whether the OpenCtrl Cloud subscription can actually be bought yet (CLAYFORM_CLOUD_PLAN_LIVE=1). Until it can,
+ * Free-tier prompts say it's coming soon instead of offering a price.
+ */
+export const cloudPlanLive = () => process.env.CLAYFORM_CLOUD_PLAN_LIVE === "1";
+export const CLOUD_COMING_SOON = "OpenCtrl Cloud is coming soon: one subscription for every OpenCtrl app with much higher limits.";
+
 /** Clayform's own Cloud spec, validated once at startup (a broken manifest fails loudly in tests and builds). */
 export const CLOUD: CloudSpec = cloudSchema.parse(manifestJson.cloud);
 
 export type PlanId = "free" | "cloud" | "grandfathered";
 export const PLANS: Record<PlanId, { name: string; priceCents: number; tier: Tier }> = {
   free: { name: "Free Cloud", priceCents: 0, tier: "free" },
-  cloud: { name: "OPENCTRL Cloud", priceCents: 1200, tier: "cloud" },
+  cloud: { name: "OpenCtrl Cloud", priceCents: 1200, tier: "cloud" },
   grandfathered: { name: "Early account", priceCents: 0, tier: "unlimited" },
 };
 export const CLOUD_PRICE_LABEL = "$12/month";
@@ -73,7 +80,7 @@ export async function monthUsage(userId: string, d = new Date()): Promise<Usage>
   return out;
 }
 
-/** Add-on packs bought for a workspace ({ packId: quantity }). Set by an admin until OPENCTRL billing (build plan 7.3). */
+/** Add-on packs bought for a workspace ({ packId: quantity }). Set by an admin until OpenCtrl billing (build plan 7.3). */
 export async function getPacks(userId: string): Promise<Record<string, number>> {
   try {
     const v = JSON.parse((await getSetting(`packs:${userId}`)) ?? "{}");
@@ -153,12 +160,14 @@ export async function uploadsPaused(ownerId: string | null): Promise<boolean> {
 export const PAUSED_MESSAGE = "This form isn't taking new responses right now. Please check back later.";
 export const UPLOADS_PAUSED_MESSAGE = "This form can't take more files right now. You can still send your answers without one.";
 
-/** What to say when a meter is at 80% or 100%: an upgrade for Free, a pack for OPENCTRL Cloud. Never "we deleted". */
+/** What to say when a meter is at 80% or 100%: an upgrade for Free, a pack for OpenCtrl Cloud. Never "we deleted". */
 export function noticeFor(status: LimitStatus, m: MeterStatus, threshold: 80 | 100): { subject: string; body: string; email: EmailMessage } {
   const what = `${m.used.toLocaleString("en-US")} of ${m.limit?.toLocaleString("en-US")} ${m.unit}${m.period === "month" ? " this month" : ""}`;
   const offer =
     status.tier === "free"
-      ? `Join OPENCTRL Cloud for ${CLOUD_PRICE_LABEL} to raise this to ${CLOUD.fair_use[m.meter]?.toLocaleString("en-US")} ${m.unit}, and get every other OPENCTRL app too.`
+      ? cloudPlanLive()
+        ? `Join OpenCtrl Cloud for ${CLOUD_PRICE_LABEL} to raise this to ${CLOUD.fair_use[m.meter]?.toLocaleString("en-US")} ${m.unit}, and get every other OpenCtrl app too.`
+        : CLOUD_COMING_SOON
       : packsFor(CLOUD, m.meter).length
         ? `Add a pack (${packsFor(CLOUD, m.meter).map((p) => p.label).join(", ")}) to raise it. Your forms keep working either way.`
         : "Your forms keep working. We'll be in touch if this keeps up.";

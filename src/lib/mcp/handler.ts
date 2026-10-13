@@ -1,4 +1,4 @@
-// HTTP entry for the MCP server, built with the shared OPENCTRL kit (stateless Streamable HTTP, JSON responses).
+// HTTP entry for the MCP server, built with the shared OpenCtrl kit (stateless Streamable HTTP, JSON responses).
 // Every request must carry an API key: "Authorization: Bearer cf_…". Browser cookies are ignored here on purpose.
 import "server-only";
 import { authenticate, type Caller } from "../api";

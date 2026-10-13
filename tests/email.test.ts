@@ -74,12 +74,12 @@ describe("email template", () => {
     expect(m.html).toMatch(/color-scheme/);
     expect(m.html).toContain(`src="${ORIGIN}/icon-512.png"`);
     expect(m.html).not.toMatch(/\.svg/);
-    expect(m.html).toContain("Clayform, an OPENCTRL Original");
+    expect(m.html).toContain("Clayform, an OpenCtrl Original");
     expect(m.html).toContain("https://github.com/claycovyn/clayform");
     expect(m.html).toContain(`href="${ORIGIN}/go"`);
     expect(m.text).toContain("A heading");
     expect(m.text).toContain(`Go: ${ORIGIN}/go`);
-    expect(m.text).toContain("Clayform, an OPENCTRL Original");
+    expect(m.text).toContain("Clayform, an OpenCtrl Original");
     expect(m.text).not.toMatch(/<[a-z]/i);
   });
 
@@ -136,10 +136,26 @@ describe("confirmation email", () => {
 });
 
 describe("usage notices", () => {
+  it("free tier while the Cloud plan isn't live: says it's coming soon, offers no price", () => {
+    delete process.env.CLAYFORM_CLOUD_PLAN_LIVE;
+    const limit = plans.CLOUD.free.responses;
+    for (const [used, t] of [[Math.round(limit * 0.8), 80], [limit, 100]] as const) {
+      const n = plans.noticeFor(status("free"), meter("responses", limit, used), t);
+      for (const part of [n.email.html, n.email.text, n.body]) {
+        expect(part).toContain("OpenCtrl Cloud is coming soon: one subscription for every OpenCtrl app with much higher limits.");
+        expect(part).not.toContain("$12/month");
+        expect(part).not.toContain("Join OpenCtrl Cloud");
+        expect(part).toContain("Nothing has been deleted");
+      }
+    }
+  });
+
   it("free tier at 80%: numbers from the manifest, the upgrade and the usage link", () => {
+    process.env.CLAYFORM_CLOUD_PLAN_LIVE = "1";
     const limit = plans.CLOUD.free.responses;
     const used = Math.round(limit * 0.8);
     const n = plans.noticeFor(status("free"), meter("responses", limit, used), 80);
+    delete process.env.CLAYFORM_CLOUD_PLAN_LIVE;
     preview("usage-free-80", n.email);
     expect(n.email.subject).toBe("Clayform: you've used 80% of your responses");
     for (const part of [n.email.html, n.email.text]) {
@@ -166,7 +182,7 @@ describe("usage notices", () => {
     expect(s.email.text).toContain("stopped taking new file uploads");
   });
 
-  it("OPENCTRL Cloud over fair use: offers a pack, never pauses", () => {
+  it("OpenCtrl Cloud over fair use: offers a pack, never pauses", () => {
     const limit = plans.CLOUD.fair_use.responses;
     const n = plans.noticeFor(status("cloud"), meter("responses", limit, limit), 100);
     preview("usage-cloud-100", n.email);

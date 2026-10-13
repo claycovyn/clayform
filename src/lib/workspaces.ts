@@ -16,8 +16,8 @@ export interface WorkspaceRow {
   usage: Usage;
   costUsd: number;
   /**
-   * Plan price while billing is manual. An OPENCTRL Cloud subscription ($12) covers every Original, so this is the
-   * whole subscription until OPENCTRL allocates revenue across apps (build plan 7.3 / 7.8).
+   * Plan price while billing is manual. An OpenCtrl Cloud subscription ($12) covers every Original, so this is the
+   * whole subscription until OpenCtrl allocates revenue across apps (build plan 7.3 / 7.8).
    */
   revenueUsd: number;
   marginUsd: number;

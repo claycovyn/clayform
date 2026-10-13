@@ -83,7 +83,7 @@ export default function Home() {
               Clayform is a beautiful, conversational form builder you own. One question at a time, logic, scoring, file uploads and real analytics — with no
               paywalled features.{" "}
               {cloudEnabled()
-                ? `Self-host it free with no response caps, or start free here (${CLOUD.free.responses} responses a month) and go further with OPENCTRL Cloud.`
+                ? `Self-host it free with no response caps, or start free here (${CLOUD.free.responses} responses a month) and go further with OpenCtrl Cloud.`
                 : "No response caps and no monthly bill."}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">

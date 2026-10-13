@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { CLOUD, CLOUD_PRICE_LABEL } from "@/lib/plans";
 
-export const metadata = { title: "Pricing", description: "Clayform is free to self-host. Hosted: start free, or get every OPENCTRL app with OPENCTRL Cloud." };
+export const metadata = { title: "Pricing", description: "Clayform is free to self-host. Hosted: start free, or get every OpenCtrl app with OpenCtrl Cloud." };
 
 const n = (v: number | undefined) => (v === undefined ? "—" : v.toLocaleString("en-US"));
 
@@ -40,9 +40,9 @@ export default function Pricing() {
             <Link href="/signup" className="btn-primary mt-auto pt-3">Start free</Link>
           </section>
           <section className="card flex flex-col border-2 border-brand p-6">
-            <h2 className="text-xl font-bold">OPENCTRL Cloud</h2>
+            <h2 className="text-xl font-bold">OpenCtrl Cloud</h2>
             <p className="mt-1 font-display text-4xl font-extrabold">{CLOUD_PRICE_LABEL.replace("/month", "")}<span className="text-base font-semibold text-ink-soft"> a month</span></p>
-            <p className="mt-1 text-sm font-semibold text-brand-dark">Every hosted OPENCTRL app, one subscription.</p>
+            <p className="mt-1 text-sm font-semibold text-brand-dark">Every hosted OpenCtrl app, one subscription.</p>
             <ul className="mt-5 space-y-2 text-sm">
               {Object.keys(m).map((k) => <li key={k}>Up to {line(k, CLOUD.fair_use)} in Clayform (fair use)</li>)}
               <li>Heavy use? Add a pack ({CLOUD.packs.map((p) => p.label).join(", ")}) instead of hitting a wall.</li>

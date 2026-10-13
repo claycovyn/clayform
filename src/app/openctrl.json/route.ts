@@ -1,6 +1,6 @@
 import manifest from "../../../openctrl.json";
 
-// The OPENCTRL manifest (repo root openctrl.json), served so OPENCTRL and agents can discover this app's MCP server.
+// The OpenCtrl manifest (repo root openctrl.json), served so OpenCtrl and agents can discover this app's MCP server.
 // Self-hosted installs point at their own address.
 export const dynamic = "force-dynamic";
 

@@ -4,7 +4,7 @@ import { SetupNeeded } from "@/components/SetupNeeded";
 import { authProblem, currentUser } from "@/lib/auth";
 import { getTakedown, listForms, storageProblem } from "@/lib/db";
 import { TEMPLATES } from "@/lib/templates";
-import { CLOUD, CLOUD_PRICE_LABEL, limitStatus } from "@/lib/plans";
+import { CLOUD, CLOUD_PRICE_LABEL, cloudPlanLive, limitStatus } from "@/lib/plans";
 import { packsFor } from "@/lib/mcp-kit";
 import { needsEmailVerification } from "@/lib/verify";
 
@@ -42,7 +42,7 @@ export default async function FormsPage({ searchParams }: { searchParams: Promis
               responsesPaused: status.responsesPaused,
               uploadsPaused: status.uploadsPaused,
               resetsAt: status.resetsAt,
-              upgrade: { price: CLOUD_PRICE_LABEL, url: process.env.OPENCTRL_CLOUD_URL || null, fairUse: CLOUD.fair_use },
+              upgrade: { live: cloudPlanLive(), price: CLOUD_PRICE_LABEL, url: process.env.OPENCTRL_CLOUD_URL || null, fairUse: CLOUD.fair_use },
               packs: Object.fromEntries(Object.keys(CLOUD.meters).map((k) => [k, packsFor(CLOUD, k).map((p) => p.label)])),
             }
           : null

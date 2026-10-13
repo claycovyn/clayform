@@ -15,8 +15,8 @@ export interface PlanUsage {
   responsesPaused: boolean;
   uploadsPaused: boolean;
   resetsAt: string;
-  /** Free tier: what OPENCTRL Cloud gives instead. */
-  upgrade: { price: string; url: string | null; fairUse: Record<string, number> };
+  /** Free tier: what OpenCtrl Cloud gives instead. */
+  upgrade: { live: boolean; price: string; url: string | null; fairUse: Record<string, number> };
   /** Subscribers: packs that raise each meter. */
   packs: Record<string, string[]>;
 }
@@ -87,9 +87,14 @@ function UsageBanner({ usage }: { usage: PlanUsage }) {
         <p className="mt-3 text-sm text-red-700">Your forms aren&apos;t taking <b>new</b> responses until {resets}. People already answering can finish.</p>
       )}
       {usage.uploadsPaused && <p className="mt-1 text-sm text-red-700">Your forms aren&apos;t taking new file uploads until you free up space or upgrade.</p>}
-      {usage.tier === "free" && worst !== "ok" && (
+      {usage.tier === "free" && worst !== "ok" && !usage.upgrade.live && (
         <p className="mt-3 text-sm">
-          <b>Join OPENCTRL Cloud</b> for {usage.upgrade.price}: up to {fmt(usage.upgrade.fairUse.responses ?? 0)} responses a month here, and every other OPENCTRL app too.{" "}
+          <b>OpenCtrl Cloud is coming soon</b>: one subscription for every OpenCtrl app with much higher limits. Or self-host Clayform with no limits.
+        </p>
+      )}
+      {usage.tier === "free" && worst !== "ok" && usage.upgrade.live && (
+        <p className="mt-3 text-sm">
+          <b>Join OpenCtrl Cloud</b> for {usage.upgrade.price}: up to {fmt(usage.upgrade.fairUse.responses ?? 0)} responses a month here, and every other OpenCtrl app too.{" "}
           {usage.upgrade.url ? <a className="font-semibold text-brand underline" href={usage.upgrade.url}>Upgrade</a> : <span className="text-ink-soft">(Coming soon.)</span>} Or self-host Clayform with no limits.
         </p>
       )}
