@@ -22,6 +22,8 @@ export interface User {
   plan?: string;
   /** Set when the person clicked the link in the verification email. */
   emailVerifiedAt?: string | null;
+  /** The OpenCtrl account (OIDC `sub`) this account signs in with, once linked. */
+  openctrlSub?: string | null;
 }
 
 /** One metered quantity for one workspace on one UTC day. */
@@ -139,6 +141,9 @@ interface Store {
   /** Stored bytes for one workspace: form and response documents plus uploads. */
   storageBytes(userId: string): Promise<number>;
   setEmailVerified(id: string, at: string): Promise<void>;
+  getUserByOpenctrlSub(sub: string): Promise<User | null>;
+  /** Links an OpenCtrl account; false if that OpenCtrl account is already linked to someone else. */
+  linkOpenctrl(id: string, sub: string): Promise<boolean>;
   /** Published forms with their owner, for abuse scans. */
   publishedForms(): Promise<{ form: Form; ownerId: string | null }[]>;
   /** Releases the connection; the next call reopens it. */
@@ -171,6 +176,7 @@ const toUser = (r: Row): User => ({
   createdAt: iso(r.created_at),
   plan: r.plan ? String(r.plan) : "grandfathered",
   emailVerifiedAt: r.email_verified_at ? iso(r.email_verified_at) : null,
+  openctrlSub: r.openctrl_sub ? String(r.openctrl_sub) : null,
 });
 const toReport = (r: Row): AbuseReport => ({
   id: String(r.id),
@@ -279,6 +285,8 @@ function sqliteStore(): Store {
     const userCols = handle.prepare("PRAGMA table_info(users)").all() as Row[];
     if (!userCols.some((c) => c.name === "plan")) handle.exec("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'grandfathered'");
     if (!userCols.some((c) => c.name === "email_verified_at")) handle.exec("ALTER TABLE users ADD COLUMN email_verified_at TEXT");
+    if (!userCols.some((c) => c.name === "openctrl_sub")) handle.exec("ALTER TABLE users ADD COLUMN openctrl_sub TEXT");
+    handle.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_openctrl_sub ON users(openctrl_sub)");
     // Installs from before accounts existed: add the owner column.
     const cols = handle.prepare("PRAGMA table_info(forms)").all() as Row[];
     if (!cols.some((c) => c.name === "owner_id")) {
@@ -512,6 +520,19 @@ function sqliteStore(): Store {
     async setEmailVerified(id, at) {
       db().prepare("UPDATE users SET email_verified_at = ? WHERE id = ?").run(at, id);
     },
+    async getUserByOpenctrlSub(sub) {
+      const r = db().prepare("SELECT * FROM users WHERE openctrl_sub = ?").get(sub) as Row | undefined;
+      return r ? toUser(r) : null;
+    },
+    async linkOpenctrl(id, sub) {
+      try {
+        db().prepare("UPDATE users SET openctrl_sub = ? WHERE id = ?").run(sub, id);
+        return true;
+      } catch (e) {
+        if (String((e as Error).message).includes("UNIQUE")) return false;
+        throw e;
+      }
+    },
     async publishedForms() {
       const rows = db().prepare("SELECT doc, owner_id FROM forms WHERE json_extract(doc, '$.status') = 'published' ORDER BY updated_at DESC LIMIT 2000").all() as Row[];
       return rows.map((r) => ({ form: doc<Form>(r.doc), ownerId: r.owner_id ? String(r.owner_id) : null }));
@@ -566,6 +587,8 @@ function postgresStore(url: string): Store {
         CREATE INDEX IF NOT EXISTS clayform_api_keys_user ON clayform_api_keys(user_id, created_at);
         ALTER TABLE clayform_users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'grandfathered';
         ALTER TABLE clayform_users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+        ALTER TABLE clayform_users ADD COLUMN IF NOT EXISTS openctrl_sub TEXT;
+        CREATE UNIQUE INDEX IF NOT EXISTS clayform_users_openctrl_sub ON clayform_users(openctrl_sub);
         CREATE TABLE IF NOT EXISTS clayform_usage_daily (
           user_id TEXT NOT NULL REFERENCES clayform_users(id) ON DELETE CASCADE, day TEXT NOT NULL, metric TEXT NOT NULL,
           amount BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (user_id, day, metric)
@@ -820,6 +843,21 @@ function postgresStore(url: string): Store {
       const q = await sql();
       await q`UPDATE clayform_users SET email_verified_at = ${at} WHERE id = ${id}`;
     },
+    async getUserByOpenctrlSub(sub) {
+      const q = await sql();
+      const [r] = await q`SELECT * FROM clayform_users WHERE openctrl_sub = ${sub}`;
+      return r ? toUser(r) : null;
+    },
+    async linkOpenctrl(id, sub) {
+      const q = await sql();
+      try {
+        await q`UPDATE clayform_users SET openctrl_sub = ${sub} WHERE id = ${id}`;
+        return true;
+      } catch (e) {
+        if ((e as { code?: string }).code === "23505") return false;
+        throw e;
+      }
+    },
     async publishedForms() {
       const q = await sql();
       const rows = await q`SELECT doc, owner_id FROM clayform_forms WHERE doc->>'status' = 'published' ORDER BY updated_at DESC LIMIT 2000`;
@@ -890,3 +928,5 @@ export const setSetting = (key: string, value: string) => s().setSetting(key, va
 export const publishedForms = () => s().publishedForms();
 export const storageBytes = (userId: string) => s().storageBytes(userId);
 export const setEmailVerified = (id: string, at: string) => s().setEmailVerified(id, at);
+export const getUserByOpenctrlSub = (sub: string) => s().getUserByOpenctrlSub(sub);
+export const linkOpenctrl = (id: string, sub: string) => s().linkOpenctrl(id, sub);

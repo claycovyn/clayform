@@ -11,6 +11,7 @@ This is for the hosted service (clayform.vercel.app). **Self-hosters don't need 
 | `CLAYFORM_CLOUD_PLAN_LIVE=1` | The OpenCtrl Cloud subscription can be bought. Free-tier usage notices then offer "Join OpenCtrl Cloud for $12/month". Unset (today): they say "OpenCtrl Cloud is coming soon: one subscription for every OpenCtrl app with much higher limits." and show no price |
 | `CLAYFORM_ADMIN_EMAILS` | Comma-separated emails that can open `/admin` (signed in with a browser session) |
 | `CLAYFORM_SUPPORT_EMAIL` | Shown to owners whose form was taken down, so they can appeal |
+| `OPENCTRL_CLIENT_ID`, `OPENCTRL_CLIENT_SECRET` | Turn on **Continue with OpenCtrl** on the log-in and sign-up pages. Create them on OpenCtrl's admin page for Clayform (Sign in with OpenCtrl), with the redirect URI `https://<this site>/api/auth/openctrl/callback`. `OPENCTRL_ISSUER` overrides https://openctrl.app |
 
 ## Plans and limits (`src/lib/plans.ts`, limits from `openctrl.json`)
 

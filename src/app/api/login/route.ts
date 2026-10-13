@@ -1,6 +1,8 @@
+import { cookies } from "next/headers";
 import { authProblem, normalizeEmail, startSession, verifyNothing, verifyPassword } from "@/lib/auth";
 import { json, readJson } from "@/lib/api";
-import { getUserByEmail, storageProblem } from "@/lib/db";
+import { getUserByEmail, linkOpenctrl, storageProblem } from "@/lib/db";
+import { LINK_COOKIE, openCookie } from "@/lib/openctrlLogin";
 import { clientIp, rateLimited } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
@@ -20,5 +22,13 @@ export async function POST(req: Request) {
   }
   if (!(await verifyPassword(password, user.passwordHash))) return json({ error: "Wrong email or password." }, 401);
   await startSession(user);
+  // Came from "Continue with OpenCtrl" with an email that already had an account here: the password proves it's
+  // theirs, so connect the two now.
+  const jar = await cookies();
+  const pending = openCookie<{ sub: string; email: string }>("oc-link", jar.get(LINK_COOKIE)?.value);
+  if (pending) {
+    jar.delete(LINK_COOKIE);
+    if (pending.email === user.email && !user.openctrlSub && (await linkOpenctrl(user.id, pending.sub))) return json({ ok: true, linked: true });
+  }
   return json({ ok: true });
 }

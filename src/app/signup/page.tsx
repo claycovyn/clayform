@@ -2,9 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/dashboard/AuthForm";
 import { AuthShell } from "@/components/dashboard/AuthShell";
+import { OpenctrlButton } from "@/components/dashboard/OpenctrlButton";
 import { SetupNeeded } from "@/components/SetupNeeded";
 import { authProblem, currentUser, signupsOpen } from "@/lib/auth";
 import { storageProblem } from "@/lib/db";
+import { openctrlEnabled } from "@/lib/openctrlLogin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Create your account" };
@@ -23,6 +25,7 @@ export default async function SignupPage() {
     );
   return (
     <AuthShell title="Make forms people finish" subtitle="Free forever. No response limits. No card needed.">
+      {openctrlEnabled() && <div className="mb-4"><OpenctrlButton /></div>}
       <AuthForm mode="signup" />
     </AuthShell>
   );
