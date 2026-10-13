@@ -64,7 +64,10 @@ beforeAll(async () => {
   userId = await makeUser("clay@example.com");
   otherUserId = await makeUser("other@example.com");
 });
-afterAll(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+afterAll(async () => {
+  await db.closeDb();
+  fs.rmSync(dataDir, { recursive: true, force: true });
+});
 
 describe("API keys", () => {
   it("are shown once, stored only as a hash, and verify until revoked", async () => {

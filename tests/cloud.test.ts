@@ -43,7 +43,10 @@ beforeAll(async () => {
 afterEach(() => {
   delete process.env.CLAYFORM_CLOUD;
 });
-afterAll(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+afterAll(async () => {
+  await db.closeDb();
+  fs.rmSync(dataDir, { recursive: true, force: true });
+});
 
 describe("plans", () => {
   it("new sign-ups get Free Cloud only once Cloud is on; older accounts are grandfathered", async () => {

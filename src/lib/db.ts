@@ -141,6 +141,8 @@ interface Store {
   setEmailVerified(id: string, at: string): Promise<void>;
   /** Published forms with their owner, for abuse scans. */
   publishedForms(): Promise<{ form: Form; ownerId: string | null }[]>;
+  /** Releases the connection; the next call reopens it. */
+  close(): Promise<void>;
 }
 
 export const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
@@ -295,6 +297,10 @@ function sqliteStore(): Store {
     FROM forms f`;
 
   return {
+    async close() {
+      handle?.close();
+      handle = null;
+    },
     async createUser(u) {
       try {
         db()
@@ -591,6 +597,12 @@ function postgresStore(url: string): Store {
     (SELECT COUNT(*) FROM clayform_responses r WHERE r.form_id = f.id AND r.completed_at IS NOT NULL) AS completes`;
 
   return {
+    async close() {
+      const c = client;
+      client = null;
+      ready = null;
+      await c?.end();
+    },
     async createUser(u) {
       const q = await sql();
       const rows = await q`INSERT INTO clayform_users (id, email, name, password_hash, password_changed_at, created_at, plan)
@@ -822,6 +834,13 @@ function s(): Store {
   if (problem) throw new Error(problem);
   store ??= DATABASE_URL ? postgresStore(DATABASE_URL) : sqliteStore();
   return store;
+}
+
+/** Closes the database connection (tests call this before deleting the data directory). */
+export async function closeDb(): Promise<void> {
+  const st = store;
+  store = null;
+  await st?.close();
 }
 
 export const createUser = (user: User) => s().createUser(user);
