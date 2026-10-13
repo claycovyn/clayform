@@ -247,12 +247,12 @@ describe("the $12 model: fair use, packs, storage, notices, verification", () =>
     process.env.CLAYFORM_CLOUD = "1";
     process.env.RESEND_API_KEY = "re_test";
     process.env.CLAYFORM_EMAIL_FROM = "Clayform <hello@example.com>";
-    const sent: { to: string; subject: string; text: string }[] = [];
+    const sent: { to: string; subject: string; text: string; html: string }[] = [];
     const realFetch = globalThis.fetch;
     globalThis.fetch = (async (url: string, init: RequestInit) => {
       if (String(url).includes("api.resend.com")) {
         const b = JSON.parse(String(init.body));
-        sent.push({ to: b.to[0], subject: b.subject, text: b.text });
+        sent.push({ to: b.to[0], subject: b.subject, text: b.text, html: b.html });
         return new Response("{}", { status: 200 });
       }
       return realFetch(url, init);
@@ -270,6 +270,8 @@ describe("the $12 model: fair use, packs, storage, notices, verification", () =>
       expect(sent[1].subject).toMatch(/reached your responses limit/);
       expect(sent[1].text).toMatch(/Join OPENCTRL Cloud for \$12\/month/);
       expect(sent[1].text).toMatch(/Nothing has been deleted/);
+      expect(sent[1].html).toMatch(/^<!DOCTYPE html>/);
+      expect(sent[1].html).toContain("/forms");
       expect((await plans.monthUsage(u.id)).emails_sent).toBe(2);
 
       const sub = await user("cloud");

@@ -10,6 +10,7 @@ import "server-only";
 import manifestJson from "../../openctrl.json";
 import { addUsage, getSetting, getUser, setSetting, storageBytes, usageRows, type User } from "./db";
 import { sendEmail } from "./email";
+import { renderEmail, type EmailMessage } from "./emailTemplate";
 import { cloudSchema, entitlementLimits, packsFor, usageStatus, type CloudSpec, type Limits, type MeterStatus, type Tier } from "./mcp-kit";
 import { siteUrl } from "./site";
 
@@ -153,7 +154,7 @@ export const PAUSED_MESSAGE = "This form isn't taking new responses right now. P
 export const UPLOADS_PAUSED_MESSAGE = "This form can't take more files right now. You can still send your answers without one.";
 
 /** What to say when a meter is at 80% or 100%: an upgrade for Free, a pack for OPENCTRL Cloud. Never "we deleted". */
-export function noticeFor(status: LimitStatus, m: MeterStatus, threshold: 80 | 100): { subject: string; body: string } {
+export function noticeFor(status: LimitStatus, m: MeterStatus, threshold: 80 | 100): { subject: string; body: string; email: EmailMessage } {
   const what = `${m.used.toLocaleString("en-US")} of ${m.limit?.toLocaleString("en-US")} ${m.unit}${m.period === "month" ? " this month" : ""}`;
   const offer =
     status.tier === "free"
@@ -169,11 +170,26 @@ export function noticeFor(status: LimitStatus, m: MeterStatus, threshold: 80 | 1
           ? "Your forms have stopped taking new file uploads."
           : ""
       : "";
+  const safe = "Nothing has been deleted, and you can export everything at any time.";
+  const subject = threshold === 100 ? `Clayform: you've reached your ${m.meter} limit` : `Clayform: you've used 80% of your ${m.meter}`;
+  const heading = threshold === 100 ? `You've reached your ${m.meter} limit` : `You've used 80% of your ${m.meter}`;
+  const site = siteUrl();
+  const email = renderEmail({
+    subject,
+    preheader: `${what} on ${status.planName}. ${safe}`,
+    heading,
+    blocks: [
+      { type: "meter", label: `Your usage on ${status.planName}`, value: what, pct: m.pct ?? (m.limit ? (m.used / m.limit) * 100 : 0) },
+      ...[paused, offer, safe].filter(Boolean).map((text) => ({ type: "paragraph" as const, text })),
+      { type: "button", label: "See your usage", href: `${site}/forms` },
+    ],
+    reason: "You're getting this because you have a Clayform account.",
+    siteUrl: site,
+  });
   return {
-    subject: threshold === 100 ? `Clayform: you've reached your ${m.meter} limit` : `Clayform: you've used 80% of your ${m.meter}`,
-    body: [`You've used ${what} on ${status.planName}.`, paused, offer, "Nothing has been deleted, and you can export everything at any time.", `Your usage: ${siteUrl()}/forms`]
-      .filter(Boolean)
-      .join("\n\n"),
+    subject,
+    body: [`You've used ${what} on ${status.planName}.`, paused, offer, safe, `Your usage: ${site}/forms`].filter(Boolean).join("\n\n"),
+    email,
   };
 }
 
@@ -195,7 +211,7 @@ export async function checkUsageNotices(ownerId: string | null): Promise<void> {
         await setSetting(key, new Date().toISOString());
         if (t === 100) await setSetting(`notice:${user.id}:${month}:${m.meter}:80`, new Date().toISOString());
         const n = noticeFor(status, m, t);
-        const r = await sendEmail(user.email, n.subject, n.body);
+        const r = await sendEmail(user.email, n.email);
         if (r.sent) await meter(user.id, "emails_sent");
         break;
       }

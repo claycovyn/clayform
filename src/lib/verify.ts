@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { sign } from "./auth";
 import type { User } from "./db";
 import { emailConfigured, sendEmail } from "./email";
+import { renderEmail, type EmailMessage } from "./emailTemplate";
 import { cloudEnabled, meter, planOf } from "./plans";
 import { siteUrl } from "./site";
 
@@ -30,12 +31,26 @@ export function validVerification(user: Pick<User, "id" | "email">, exp: string 
   return expected.length === given.length && crypto.timingSafeEqual(expected, given);
 }
 
+/** The confirmation email: a button, the raw link as a fallback, and how long it lasts. */
+export function verificationEmail(user: Pick<User, "name">, link: string, origin = siteUrl()): EmailMessage {
+  return renderEmail({
+    subject: "Confirm your email for Clayform",
+    preheader: "Confirm your email to start publishing forms.",
+    heading: "Confirm your email",
+    blocks: [
+      { type: "paragraph", text: `Hi ${user.name},` },
+      { type: "paragraph", text: "Confirm your email to start publishing forms on Clayform." },
+      { type: "button", label: "Confirm email", href: link },
+      { type: "link", label: "Or paste this link into your browser:", href: link },
+      { type: "fineprint", text: "The link works for 3 days. If you didn't sign up, ignore this email." },
+    ],
+    reason: "You're getting this because this address was used to sign up for Clayform.",
+    siteUrl: origin,
+  });
+}
+
 export async function sendVerification(user: Pick<User, "id" | "email" | "name">, origin?: string): Promise<boolean> {
-  const r = await sendEmail(
-    user.email,
-    "Confirm your email for Clayform",
-    `Hi ${user.name},\n\nConfirm your email to start publishing forms on Clayform:\n\n${verificationLink(user, origin)}\n\nThe link works for 3 days. If you didn't sign up, ignore this email.`,
-  );
+  const r = await sendEmail(user.email, verificationEmail(user, verificationLink(user, origin), origin));
   if (r.sent) await meter(user.id, "emails_sent");
   return r.sent;
 }
